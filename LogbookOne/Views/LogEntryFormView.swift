@@ -5,10 +5,11 @@ struct LogEntryFormView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     
-    @State private var selectedType: LogEntryType = .task
+    @State private var selectedType: LogEntryType
     @State private var description: String = ""
     @State private var amount: String = ""
     @State private var tag: String = ""
+    @State private var isComplete: Bool = false
     @State private var selectedClient: Client?
     @State private var entryDate: Date = Date()
     @State private var showingSavedAnimation = false
@@ -19,6 +20,11 @@ struct LogEntryFormView: View {
     private var clients: FetchedResults<Client>
     
     var client: Client?
+    
+    init(selectedType: LogEntryType = .task, client: Client? = nil) {
+        self._selectedType = State(initialValue: selectedType)
+        self.client = client
+    }
     
     var body: some View {
         NavigationStack {
@@ -49,6 +55,10 @@ struct LogEntryFormView: View {
                         if selectedType == .payment {
                             TextField("Amount ($)", text: $amount)
                                 .keyboardType(.decimalPad)
+                        }
+                        
+                        if selectedType == .task {
+                            Toggle("Completed", isOn: $isComplete)
                         }
                         
                         TextField("Tag (optional)", text: $tag)
@@ -108,7 +118,11 @@ struct LogEntryFormView: View {
         entry.desc = description
         entry.tag = tag.isEmpty ? nil : tag
         entry.date = entryDate
-        entry.client = selectedClient
+        entry.client = selectedClient ?? client
+        
+        if selectedType == .task {
+            entry.isComplete = isComplete
+        }
         
         if selectedType == .payment, let amountValue = Decimal(string: amount) {
             entry.amount = NSDecimalNumber(decimal: amountValue)

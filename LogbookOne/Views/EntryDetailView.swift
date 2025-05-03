@@ -1,12 +1,15 @@
 import SwiftUI
 import CoreData
 
+
+
 struct EntryDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var entry: LogEntry
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
+    @State private var isComplete: Bool = false
     
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -56,8 +59,9 @@ struct EntryDetailView: View {
             }
         }
         .sheet(isPresented: $showingEditSheet) {
-            // In the future, implement edit functionality
-            Text("Edit functionality coming soon")
+            // Pass the entry to LogEntryFormView for editing
+            EditEntryView(entry: entry)
+                .environment(\.managedObjectContext, viewContext)
         }
         .alert("Delete Entry", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -67,11 +71,14 @@ struct EntryDetailView: View {
         } message: {
             Text("Are you sure you want to delete this entry? This action cannot be undone.")
         }
+        .onAppear {
+            isComplete = entry.isComplete
+        }
     }
     
     private var entryHeader: some View {
         HStack {
-            EntryTypeBadge(type: LogEntryType(rawValue: entry.type) ?? .task)
+            EntryTypeBadgeView(type: LogEntryType(rawValue: entry.type) ?? .task)
                 .scaleEffect(1.2)
             
             Spacer()
@@ -100,6 +107,36 @@ struct EntryDetailView: View {
             
             Divider()
             
+            // Task completion status (if task)
+            if entry.type == LogEntryType.task.rawValue {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Status")
+                        .font(.appSubheadline)
+                        .foregroundColor(.secondaryText)
+                    
+                    Toggle(isOn: $isComplete.animation()) {
+                        Text(isComplete ? "Completed" : "Not Completed")
+                            .font(.appBody)
+                            .foregroundColor(isComplete ? .success : .primaryText)
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: .appAccent))
+                    .onChange(of: isComplete) { oldValue, newValue in
+                        entry.isComplete = newValue
+                        do {
+                            try viewContext.save()
+                            
+                            // Add haptic feedback for task completion
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
+                        } catch {
+                            print("Error saving task completion status: \(error)")
+                        }
+                    }
+                }
+                
+                Divider()
+            }
+            
             // Amount (for payment)
             if entry.type == LogEntryType.payment.rawValue,
                let amount = entry.amount as NSDecimalNumber?,
@@ -112,7 +149,7 @@ struct EntryDetailView: View {
                     
                     let amountValue = amount.doubleValue
                     Text("$\(amountValue, specifier: "%.2f")")
-                        .font(.system(.title2, design: .rounded).weight(.bold))
+                        .font(.system(.title2, design: .default).weight(.bold))
                         .foregroundColor(.paymentColor)
                 }
                 
@@ -292,6 +329,155 @@ struct EntryDetailView: View {
             dismiss()
         } catch {
             print("Error deleting entry: \(error)")
+        }
+    }
+}
+
+struct EditEntryView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject var entry: LogEntry
+    
+    @State private var description: String = ""
+    @State private var amount: String = ""
+    @State private var tag: String = ""
+    @State private var isComplete: Bool = false
+    @State private var selectedClient: Client?
+    @State private var entryDate: Date = Date()
+    @State private var showingSavedAnimation = false
+    @State private var selectedType: LogEntryType = .task
+    
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Client.name, ascending: true)],
+        animation: .default)
+    private var clients: FetchedResults<Client>
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Form {
+                    Section(header: Text("Entry Details")) {
+                        Picker("Type", selection: $selectedType) {
+                            ForEach(LogEntryType.allCases) { type in
+                                Text(type.displayName).tag(type)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        
+                        Picker("Client", selection: $selectedClient) {
+                            Text("No Client").tag(nil as Client?)
+                            ForEach(clients) { client in
+                                Text(client.name ?? "Unnamed Client").tag(client as Client?)
+                            }
+                        }
+                        
+                        DatePicker("Date", selection: $entryDate, displayedComponents: [.date, .hourAndMinute])
+                        
+                        TextField("Description", text: $description, axis: .vertical)
+                            .lineLimit(3...6)
+                        
+                        if selectedType == .payment {
+                            TextField("Amount ($)", text: $amount)
+                                .keyboardType(.decimalPad)
+                        }
+                        
+                        if selectedType == .task {
+                            Toggle("Completed", isOn: $isComplete)
+                        }
+                        
+                        TextField("Tag (optional)", text: $tag)
+                    }
+                }
+                .navigationTitle("Edit Entry")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+                    }
+                    
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            saveChanges()
+                        }
+                    }
+                }
+                
+                // Save confirmation overlay
+                if showingSavedAnimation {
+                    VStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 70))
+                            .foregroundColor(.appAccent)
+                        
+                        Text("Saved!")
+                            .font(.title2.weight(.medium))
+                            .foregroundColor(.appAccent)
+                            .padding(.top, 8)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.black.opacity(0.2))
+                    .ignoresSafeArea()
+                }
+            }
+            .onAppear {
+                // Load entry values
+                loadEntryValues()
+            }
+        }
+    }
+    
+    private func loadEntryValues() {
+        // Set values from the entry
+        selectedType = LogEntryType(rawValue: entry.type) ?? .task
+        description = entry.desc ?? ""
+        entryDate = entry.date ?? Date()
+        tag = entry.tag ?? ""
+        isComplete = entry.isComplete
+        selectedClient = entry.client
+        
+        if let amountValue = entry.amount as NSDecimalNumber? {
+            amount = amountValue.doubleValue > 0 ? String(format: "%.2f", amountValue.doubleValue) : ""
+        }
+    }
+    
+    private func saveChanges() {
+        // Update entry with new values
+        entry.type = selectedType.rawValue
+        entry.desc = description
+        entry.date = entryDate
+        entry.tag = tag.isEmpty ? nil : tag
+        entry.client = selectedClient
+        
+        if selectedType == .task {
+            entry.isComplete = isComplete
+        }
+        
+        if selectedType == .payment, let amountValue = Decimal(string: amount) {
+            entry.amount = NSDecimalNumber(decimal: amountValue)
+        } else {
+            entry.amount = NSDecimalNumber.zero
+        }
+        
+        do {
+            try viewContext.save()
+            
+            // Show success animation
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                showingSavedAnimation = true
+            }
+            
+            // Add success haptic feedback
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.success)
+            
+            // Dismiss after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                dismiss()
+            }
+        } catch {
+            print("Error saving edited entry: \(error)")
         }
     }
 }

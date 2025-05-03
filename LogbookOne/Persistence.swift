@@ -35,6 +35,7 @@ struct PersistenceController {
         entry1.desc = "Initial project setup and requirements gathering"
         entry1.date = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
         entry1.client = client1
+        entry1.isComplete = false
         
         let entry2 = LogEntry(context: viewContext)
         entry2.id = UUID()
@@ -51,6 +52,31 @@ struct PersistenceController {
         entry3.date = Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
         entry3.client = client2
         
+        let entry4 = LogEntry(context: viewContext)
+        entry4.id = UUID()
+        entry4.type = LogEntryType.task.rawValue
+        entry4.desc = "Design mobile-responsive layout"
+        entry4.date = Date()
+        entry4.client = client1
+        entry4.isComplete = true
+        entry4.tag = "Design"
+        
+        let entry5 = LogEntry(context: viewContext)
+        entry5.id = UUID()
+        entry5.type = LogEntryType.task.rawValue
+        entry5.desc = "Draft consulting proposal"
+        entry5.date = Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? Date()
+        entry5.client = client2
+        entry5.isComplete = false
+        
+        let entry6 = LogEntry(context: viewContext)
+        entry6.id = UUID()
+        entry6.type = LogEntryType.payment.rawValue
+        entry6.desc = "Initial consultation fee"
+        entry6.amount = 800
+        entry6.date = Calendar.current.date(byAdding: .day, value: -20, to: Date()) ?? Date()
+        entry6.client = client2
+        
         do {
             try viewContext.save()
         } catch {
@@ -60,10 +86,10 @@ struct PersistenceController {
         return result
     }()
 
-    let container: NSPersistentContainer
+    let container: NSPersistentCloudKitContainer
 
     init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "LogbookOne")
+        container = NSPersistentCloudKitContainer(name: "LogbookOne")
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }
