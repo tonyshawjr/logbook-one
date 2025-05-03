@@ -1,6 +1,49 @@
 import SwiftUI
 import CoreData
 
+// Time periods for revenue filtering
+enum RevenuePeriod {
+    case month, year
+}
+
+struct RevenueTimePeriodSelector: View {
+    @Binding var selectedPeriod: RevenuePeriod
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            Button(action: { selectedPeriod = .month }) {
+                Text("This Month")
+                    .font(.appSubheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(selectedPeriod == .month ? Color.appAccent : Color.cardBackground)
+                    .foregroundColor(selectedPeriod == .month ? .white : .primaryText)
+                    .cornerRadius(20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(selectedPeriod == .month ? Color.clear : Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+            }
+            
+            Button(action: { selectedPeriod = .year }) {
+                Text("This Year")
+                    .font(.appSubheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(selectedPeriod == .year ? Color.appAccent : Color.cardBackground)
+                    .foregroundColor(selectedPeriod == .year ? .white : .primaryText)
+                    .cornerRadius(20)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(selectedPeriod == .year ? Color.clear : Color.gray.opacity(0.3), lineWidth: 1)
+                    )
+            }
+            
+            Spacer()
+        }
+    }
+}
+
 struct DashboardView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var showingAddEntry = false
@@ -24,8 +67,37 @@ struct DashboardView: View {
         animation: .default)
     private var monthlyPayments: FetchedResults<LogEntry>
     
+    // For open tasks
+    @FetchRequest(
+        entity: LogEntry.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.date, ascending: false)],
+        predicate: NSPredicate(format: "type == %d AND isComplete == NO", LogEntryType.task.rawValue),
+        animation: .default)
+    private var openTasks: FetchedResults<LogEntry>
+    
+    // For yearly payment summary
+    @FetchRequest(
+        entity: LogEntry.entity(),
+        sortDescriptors: [],
+        predicate: NSPredicate(format: "type == %d AND date >= %@", 
+                               LogEntryType.payment.rawValue,
+                               Calendar.current.date(from: Calendar.current.dateComponents([.year], from: Date()))! as NSDate),
+        animation: .default)
+    private var yearlyPayments: FetchedResults<LogEntry>
+    
+    @State private var selectedRevenuePeriod: RevenuePeriod = .month
+    
     private var totalMonthlyRevenue: Double {
         monthlyPayments.reduce(0) { sum, entry in
+            if let amount = entry.amount as NSDecimalNumber? {
+                return sum + amount.doubleValue
+            }
+            return sum
+        }
+    }
+    
+    private var totalYearlyRevenue: Double {
+        yearlyPayments.reduce(0) { sum, entry in
             if let amount = entry.amount as NSDecimalNumber? {
                 return sum + amount.doubleValue
             }
@@ -36,10 +108,13 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Monthly summary card
+                // Revenue summary
                 revenueCard
                 
-                // Today's entries
+                // Task overview
+                taskOverviewCard
+                
+                // Today's entries section
                 VStack(spacing: 16) {
                     sectionHeader
                     
@@ -67,42 +142,133 @@ struct DashboardView: View {
     }
     
     private var revenueCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(spacing: 16) {
+            // Card header
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("This Month")
-                        .font(.appCaption)
-                        .foregroundColor(.secondaryText)
-                    
-                    let revenueValue = totalMonthlyRevenue
-                    Text("$\(revenueValue, specifier: "%.2f")")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .foregroundColor(.primaryText)
-                }
+                Label("Revenue Summary", systemImage: "chart.bar.fill")
+                    .font(.appHeadline)
+                    .foregroundColor(.primaryText)
                 
                 Spacer()
                 
-                Text(Date(), style: .date)
-                    .font(.appCaption)
-                    .foregroundColor(.secondaryText)
+                NavigationLink(destination: PaymentsView()) {
+                    Text("View All")
+                        .font(.appCaption.weight(.medium))
+                        .foregroundColor(.appAccent)
+                }
             }
             
             Divider()
-                .padding(.vertical, 4)
             
-            Text("\(monthlyPayments.count) payment\(monthlyPayments.count == 1 ? "" : "s")")
-                .font(.appCaption)
-                .foregroundColor(.secondaryText)
+            // Time period selector
+            RevenueTimePeriodSelector(selectedPeriod: $selectedRevenuePeriod)
+            
+            // Revenue display
+            VStack(alignment: .leading, spacing: 8) {
+                Text(selectedRevenuePeriod == .month ? "This Month" : "This Year")
+                    .font(.appCaption)
+                    .foregroundColor(.secondaryText)
+                
+                if selectedRevenuePeriod == .month {
+                    Text(formatCurrency(totalMonthlyRevenue))
+                        .font(.system(size: 34, weight: .bold, design: .default))
+                        .foregroundColor(.primaryText)
+                    
+                    Text("\(monthlyPayments.count) payment\(monthlyPayments.count == 1 ? "" : "s")")
+                        .font(.appCaption)
+                        .foregroundColor(.secondaryText)
+                } else {
+                    Text(formatCurrency(totalYearlyRevenue))
+                        .font(.system(size: 34, weight: .bold, design: .default))
+                        .foregroundColor(.primaryText)
+                    
+                    Text("\(yearlyPayments.count) payment\(yearlyPayments.count == 1 ? "" : "s")")
+                        .font(.appCaption)
+                        .foregroundColor(.secondaryText)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding()
         .background(Color.cardBackground)
         .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
+        .padding(.horizontal)
+    }
+    
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "$0.00"
+    }
+    
+    private var taskOverviewCard: some View {
+        VStack(spacing: 16) {
+            // Card header
+            HStack {
+                Label("Task Overview", systemImage: "checkmark.circle")
+                    .font(.appHeadline)
+                    .foregroundColor(.primaryText)
+                
+                Spacer()
+                
+                NavigationLink(destination: TasksView()) {
+                    Text("View All")
+                        .font(.appCaption.weight(.medium))
+                        .foregroundColor(.appAccent)
+                }
+            }
+            
+            Divider()
+            
+            // Task count display
+            HStack(spacing: 24) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("\(openTasks.count)")
+                            .font(.system(size: 32, weight: .bold, design: .default))
+                            .foregroundColor(.primaryText)
+                        
+                        Text("Open")
+                            .font(.appCaption)
+                            .foregroundColor(.secondaryText)
+                            .padding(.leading, 4)
+                    }
+                    
+                    if let nextDueTask = openTasks.first, openTasks.count > 0 {
+                        Text(nextDueTask.desc ?? "")
+                            .font(.appCaption)
+                            .foregroundColor(.secondaryText)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Spacer()
+                
+                // Add task button
+                NavigationLink(destination: LogEntryFormView(selectedType: .task)) {
+                    Text("New Task")
+                        .font(.appCaption.weight(.medium))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Color.taskColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(20)
+                }
+            }
+        }
+        .padding()
+        .background(Color.cardBackground)
+        .cornerRadius(16)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
     }
     
     private var sectionHeader: some View {
         HStack {
-            Text("Today's Entries")
+            Text("Today's Activity")
                 .font(.appTitle3)
             
             Spacer()
@@ -129,11 +295,12 @@ struct DashboardView: View {
         VStack(spacing: 24) {
             Image(systemName: "doc.text")
                 .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
+                .foregroundColor(Color.secondaryText.opacity(0.3))
                 .padding(.top, 30)
             
             Text("No Entries Today")
                 .font(.appTitle2)
+                .foregroundColor(.primaryText)
             
             Text("Add your first entry to start tracking your client work")
                 .font(.appBody)
@@ -151,8 +318,11 @@ struct DashboardView: View {
     private var entriesList: some View {
         LazyVStack(spacing: 12) {
             ForEach(todayEntries) { entry in
-                LogEntryCard(entry: entry)
-                    .padding(.horizontal)
+                NavigationLink(destination: EntryDetailView(entry: entry)) {
+                    LogEntryCard(entry: entry)
+                        .padding(.horizontal)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
         }
     }
@@ -178,7 +348,7 @@ struct LogEntryCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with type badge and time
             HStack {
-                EntryTypeBadge(type: LogEntryType(rawValue: entry.type) ?? .task)
+                EntryTypeBadgeView(type: LogEntryType(rawValue: entry.type) ?? .task)
                 
                 Spacer()
                 
@@ -227,31 +397,6 @@ struct LogEntryCard: View {
         .padding()
         .background(Color.cardBackground)
         .cornerRadius(16)
-    }
-}
-
-struct EntryTypeBadge: View {
-    let type: LogEntryType
-    
-    var body: some View {
-        Text(type.displayName)
-            .font(.appCaption.weight(.medium))
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(badgeColor.opacity(0.2))
-            .foregroundColor(badgeColor)
-            .cornerRadius(8)
-    }
-    
-    var badgeColor: Color {
-        switch type {
-        case .task:
-            return .taskColor
-        case .note:
-            return .noteColor
-        case .payment:
-            return .paymentColor
-        }
     }
 }
 

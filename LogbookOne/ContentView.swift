@@ -55,7 +55,14 @@ struct MainTabView: View {
                 DashboardView()
             }
             .tabItem {
-                Label("Dashboard", systemImage: "house")
+                Label("Today", systemImage: "house")
+            }
+            
+            NavigationStack {
+                TasksView()
+            }
+            .tabItem {
+                Label("Tasks", systemImage: "checkmark.circle")
             }
             
             NavigationStack {
@@ -63,6 +70,13 @@ struct MainTabView: View {
             }
             .tabItem {
                 Label("Clients", systemImage: "person.3")
+            }
+            
+            NavigationStack {
+                PaymentsView()
+            }
+            .tabItem {
+                Label("Payments", systemImage: "dollarsign.circle")
             }
             
             NavigationStack {

@@ -12,12 +12,13 @@
         <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="desc" optional="NO" attributeType="String" defaultValueString="No description"/>
         <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO" defaultValueString="00000000-0000-0000-0000-000000000000"/>
+        <attribute name="isComplete" optional="YES" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="tag" optional="YES" attributeType="String"/>
         <attribute name="type" optional="NO" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="client" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Client" inverseName="logEntries" inverseEntity="Client"/>
     </entity>
     <elements>
         <element name="Client" positionX="-63" positionY="-18" width="128" height="104"/>
-        <element name="LogEntry" positionX="-54" positionY="18" width="128" height="134"/>
+        <element name="LogEntry" positionX="-54" positionY="18" width="128" height="149"/>
     </elements>
 </model>
