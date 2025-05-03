@@ -49,44 +49,74 @@ struct ContentView: View {
 }
 
 struct MainTabView: View {
+    @State private var showingQuickAdd = false
+    
     var body: some View {
-        TabView {
-            NavigationStack {
-                DashboardView()
+        ZStack {
+            TabView {
+                NavigationStack {
+                    DashboardView()
+                }
+                .tabItem {
+                    Label("Today", systemImage: "house")
+                }
+                
+                NavigationStack {
+                    TasksView()
+                }
+                .tabItem {
+                    Label("Tasks", systemImage: "checkmark.circle")
+                }
+                
+                NavigationStack {
+                    ClientListView()
+                }
+                .tabItem {
+                    Label("Clients", systemImage: "person.3")
+                }
+                
+                NavigationStack {
+                    PaymentsView()
+                }
+                .tabItem {
+                    Label("Payments", systemImage: "dollarsign.circle")
+                }
+                
+                NavigationStack {
+                    ExportView()
+                }
+                .tabItem {
+                    Label("Export", systemImage: "square.and.arrow.up")
+                }
             }
-            .tabItem {
-                Label("Today", systemImage: "house")
-            }
+            .tint(Color.appAccent)
             
-            NavigationStack {
-                TasksView()
-            }
-            .tabItem {
-                Label("Tasks", systemImage: "checkmark.circle")
-            }
-            
-            NavigationStack {
-                ClientListView()
-            }
-            .tabItem {
-                Label("Clients", systemImage: "person.3")
-            }
-            
-            NavigationStack {
-                PaymentsView()
-            }
-            .tabItem {
-                Label("Payments", systemImage: "dollarsign.circle")
-            }
-            
-            NavigationStack {
-                ExportView()
-            }
-            .tabItem {
-                Label("Export", systemImage: "square.and.arrow.up")
+            // Floating Action Button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showingQuickAdd = true
+                    }) {
+                        Image(systemName: "plus")
+                            .font(.title2.bold())
+                            .foregroundColor(.white)
+                            .frame(width: 60, height: 60)
+                            .background(Color.appAccent)
+                            .clipShape(Circle())
+                            .shadow(color: Color.appAccent.opacity(0.3), radius: 5, x: 0, y: 3)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 80) // Position above tab bar
+                }
             }
         }
-        .tint(Color.appAccent)
+        .sheet(isPresented: $showingQuickAdd) {
+            QuickAddView()
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+        }
     }
 }
 

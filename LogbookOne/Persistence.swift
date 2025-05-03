@@ -10,72 +10,55 @@ import CoreData
 struct PersistenceController {
     static let shared = PersistenceController()
 
-    @MainActor
-    static let preview: PersistenceController = {
+    static var preview: PersistenceController = {
         let result = PersistenceController(inMemory: true)
         let viewContext = result.container.viewContext
         
         // Create sample clients
         let client1 = Client(context: viewContext)
         client1.id = UUID()
-        client1.name = "Acme Corp"
-        client1.tag = "Web Development"
-        client1.hourlyRate = 150
+        client1.name = "Sample Client"
         
-        let client2 = Client(context: viewContext)
-        client2.id = UUID()
-        client2.name = "Smith & Co"
-        client2.tag = "Consulting"
-        client2.hourlyRate = 200
+        // Create sample tasks
+        let task1 = LogEntry(context: viewContext)
+        task1.id = UUID()
+        task1.type = LogEntryType.task.rawValue
+        task1.desc = "Complete app design"
+        task1.date = Date().addingTimeInterval(86400) // Due tomorrow
         
-        // Create sample log entries
-        let entry1 = LogEntry(context: viewContext)
-        entry1.id = UUID()
-        entry1.type = LogEntryType.task.rawValue
-        entry1.desc = "Initial project setup and requirements gathering"
-        entry1.date = Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()
-        entry1.client = client1
-        entry1.isComplete = false
+        // Set creation time (when the task was created, not when it's due)
+        let creationTimeForTask1 = Date().addingTimeInterval(-3600) // Created 1 hour ago
+        task1.setValue(creationTimeForTask1, forKey: "creationDate")
+        task1.client = client1
         
-        let entry2 = LogEntry(context: viewContext)
-        entry2.id = UUID()
-        entry2.type = LogEntryType.payment.rawValue
-        entry2.desc = "Project milestone payment"
-        entry2.amount = 1500
-        entry2.date = Date()
-        entry2.client = client1
+        let task2 = LogEntry(context: viewContext)
+        task2.id = UUID()
+        task2.type = LogEntryType.task.rawValue
+        task2.desc = "Send follow-up email"
+        task2.date = Date().addingTimeInterval(3600) // Due in 1 hour
         
-        let entry3 = LogEntry(context: viewContext)
-        entry3.id = UUID()
-        entry3.type = LogEntryType.note.rawValue
-        entry3.desc = "Client requested additional features for next sprint"
-        entry3.date = Calendar.current.date(byAdding: .day, value: -2, to: Date()) ?? Date()
-        entry3.client = client2
+        // Set creation time (earlier today)
+        let creationTimeForTask2 = Date().addingTimeInterval(-7200) // Created 2 hours ago
+        task2.setValue(creationTimeForTask2, forKey: "creationDate")
         
-        let entry4 = LogEntry(context: viewContext)
-        entry4.id = UUID()
-        entry4.type = LogEntryType.task.rawValue
-        entry4.desc = "Design mobile-responsive layout"
-        entry4.date = Date()
-        entry4.client = client1
-        entry4.isComplete = true
-        entry4.tag = "Design"
+        // Create sample note
+        let note = LogEntry(context: viewContext)
+        note.id = UUID()
+        note.type = LogEntryType.note.rawValue
+        note.desc = "Client meeting notes - discussed timeline and budget"
+        note.date = Date()
+        note.setValue(Date(), forKey: "creationDate")
+        note.client = client1
         
-        let entry5 = LogEntry(context: viewContext)
-        entry5.id = UUID()
-        entry5.type = LogEntryType.task.rawValue
-        entry5.desc = "Draft consulting proposal"
-        entry5.date = Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? Date()
-        entry5.client = client2
-        entry5.isComplete = false
-        
-        let entry6 = LogEntry(context: viewContext)
-        entry6.id = UUID()
-        entry6.type = LogEntryType.payment.rawValue
-        entry6.desc = "Initial consultation fee"
-        entry6.amount = 800
-        entry6.date = Calendar.current.date(byAdding: .day, value: -20, to: Date()) ?? Date()
-        entry6.client = client2
+        // Create sample payment
+        let payment = LogEntry(context: viewContext)
+        payment.id = UUID()
+        payment.type = LogEntryType.payment.rawValue
+        payment.desc = "Website design payment"
+        payment.date = Date()
+        payment.setValue(Date(), forKey: "creationDate")
+        payment.amount = NSDecimalNumber(value: 500.00)
+        payment.client = client1
         
         do {
             try viewContext.save()
@@ -83,6 +66,7 @@ struct PersistenceController {
             let nsError = error as NSError
             fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
         }
+        
         return result
     }()
 
@@ -90,25 +74,30 @@ struct PersistenceController {
 
     init(inMemory: Bool = false) {
         container = NSPersistentCloudKitContainer(name: "LogbookOne")
+        
+        // Configure the persistent store options to enable migration
+        let description = container.persistentStoreDescriptions.first
+        description?.setOption(true as NSNumber, forKey: NSMigratePersistentStoresAutomaticallyOption)
+        description?.setOption(true as NSNumber, forKey: NSInferMappingModelAutomaticallyOption)
+        
         if inMemory {
             container.persistentStoreDescriptions.first!.url = URL(fileURLWithPath: "/dev/null")
         }
+        
         container.loadPersistentStores(completionHandler: { (storeDescription, error) in
             if let error = error as NSError? {
-                // Replace this implementation with code to handle the error appropriately.
-                // fatalError() causes the application to generate a crash log and terminate. You should not use this function in a shipping application, although it may be useful during development.
-
-                /*
-                 Typical reasons for an error here include:
-                 * The parent directory does not exist, cannot be created, or disallows writing.
-                 * The persistent store is not accessible, due to permissions or data protection when the device is locked.
-                 * The device is out of space.
-                 * The store could not be migrated to the current model version.
-                 Check the error message to determine what the actual problem was.
-                 */
+                // This is a serious error - log it and handle appropriately
+                print("Persistent store failed: \(error), \(error.userInfo)")
+                print("Store description: \(storeDescription)")
+                
+                // This is not ideal in production, but will help us debug
                 fatalError("Unresolved error \(error), \(error.userInfo)")
             }
         })
+        
         container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        
+        print("Core Data store initialized successfully")
     }
 }
