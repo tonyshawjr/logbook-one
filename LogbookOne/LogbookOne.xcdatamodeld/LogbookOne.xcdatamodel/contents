@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22522" systemVersion="24E214" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithCloudKit="YES" userDefinedModelVersionIdentifier="">
+    <entity name="Client" representedClassName="Client" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO" defaultValueString="00000000-0000-0000-0000-000000000000"/>
+        <attribute name="name" optional="NO" attributeType="String" defaultValueString="Unnamed Client"/>
+        <attribute name="tag" optional="YES" attributeType="String"/>
+        <attribute name="hourlyRate" optional="YES" attributeType="Decimal" defaultValueString="0.0" usesScalarValueType="NO"/>
+        <relationship name="logEntries" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="LogEntry" inverseName="client" inverseEntity="LogEntry"/>
+    </entity>
+    <entity name="LogEntry" representedClassName="LogEntry" syncable="YES" codeGenerationType="class">
+        <attribute name="amount" optional="YES" attributeType="Decimal" defaultValueString="0.0" usesScalarValueType="NO"/>
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="desc" optional="NO" attributeType="String" defaultValueString="No description"/>
+        <attribute name="id" optional="NO" attributeType="UUID" usesScalarValueType="NO" defaultValueString="00000000-0000-0000-0000-000000000000"/>
+        <attribute name="tag" optional="YES" attributeType="String"/>
+        <attribute name="type" optional="NO" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="client" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="Client" inverseName="logEntries" inverseEntity="Client"/>
+    </entity>
+    <elements>
+        <element name="Client" positionX="-63" positionY="-18" width="128" height="104"/>
+        <element name="LogEntry" positionX="-54" positionY="18" width="128" height="134"/>
+    </elements>
+</model>
