@@ -3,243 +3,599 @@ import CoreData
 
 struct TasksView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var filterStatus: TaskStatus = .all
-    @State private var selectedClient: Client? = nil
     @State private var showingAddTask = false
+    @State private var selectedDate = Date() // Currently selected date
+    @State private var showMonthPicker = false
+    @State private var forceUpdate: Bool = false // State variable to force refresh
     
-    @FetchRequest private var tasks: FetchedResults<LogEntry>
+    // Date calculations
+    private var calendar: Calendar { Calendar.current }
     
-    enum TaskStatus: String, CaseIterable, Identifiable {
-        case all = "All"
-        case open = "Open"
-        case completed = "Completed"
+    private var weekDates: [Date] {
+        // Get dates for the whole week containing the selected date
+        let today = calendar.startOfDay(for: selectedDate)
+        let weekday = calendar.component(.weekday, from: today)
         
-        var id: String { self.rawValue }
+        // Calculate the start of the week (Sunday)
+        let startOfWeek = calendar.date(byAdding: .day, value: 1-weekday, to: today) ?? today
+        
+        // Generate array of dates for the week
+        return (0...6).map { day in
+            calendar.date(byAdding: .day, value: day, to: startOfWeek) ?? today
+        }
     }
     
-    init(filterStatus: TaskStatus = .all, selectedClient: Client? = nil) {
-        self._filterStatus = State(initialValue: filterStatus)
-        self._selectedClient = State(initialValue: selectedClient)
+    // Dynamic fetch request for tasks on the selected day
+    @FetchRequest private var tasksForSelectedDay: FetchedResults<LogEntry>
+    
+    // Fetch request for all tasks to check which days have tasks
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.date, ascending: true)],
+        predicate: NSPredicate(format: "type == %d", LogEntryType.task.rawValue),
+        animation: .default
+    ) private var allTasks: FetchedResults<LogEntry>
+    
+    // Separate fetch request for undated tasks
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.creationDate, ascending: false)],
+        predicate: NSPredicate(format: "type == %d AND isComplete == NO AND date == nil", LogEntryType.task.rawValue),
+        animation: .default
+    ) private var undatedTasks: FetchedResults<LogEntry>
+    
+    // Separate fetch request for overdue tasks - tasks with due dates before today that aren't completed
+    @FetchRequest private var overdueTasks: FetchedResults<LogEntry>
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
+    private let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter
+    }()
+    
+    private let monthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter
+    }()
+    
+    init() {
+        // Get the start and end of the selected day
+        let today = Calendar.current.startOfDay(for: Date())
+        let startOfDay = Calendar.current.startOfDay(for: today)
+        let endOfDay = Calendar.current.date(byAdding: .day, value: 1, to: startOfDay)?.addingTimeInterval(-1) ?? startOfDay
         
-        // Build the predicate based on filters
-        var predicates: [NSPredicate] = []
+        // Create predicate for tasks on the selected day
+        let predicate = NSPredicate(format: "type == %d AND date >= %@ AND date <= %@", 
+                                   LogEntryType.task.rawValue,
+                                   startOfDay as NSDate,
+                                   endOfDay as NSDate)
         
-        // Always filter for task type
-        predicates.append(NSPredicate(format: "type == %d", LogEntryType.task.rawValue))
-        
-        // Filter by completion status
-        switch filterStatus {
-        case .open:
-            predicates.append(NSPredicate(format: "isComplete == NO"))
-        case .completed:
-            predicates.append(NSPredicate(format: "isComplete == YES"))
-        case .all:
-            break
-        }
-        
-        // Filter by client if selected
-        if let client = selectedClient {
-            predicates.append(NSPredicate(format: "client == %@", client))
-        }
-        
-        // Combine predicates with AND
-        let compoundPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        
-        // Initialize fetch request with sort descriptors and predicate
-        self._tasks = FetchRequest<LogEntry>(
+        // Initialize fetch request for tasks on selected day
+        self._tasksForSelectedDay = FetchRequest<LogEntry>(
             sortDescriptors: [
                 NSSortDescriptor(keyPath: \LogEntry.isComplete, ascending: true),
-                NSSortDescriptor(keyPath: \LogEntry.date, ascending: false)
+                NSSortDescriptor(keyPath: \LogEntry.date, ascending: true)
             ],
-            predicate: compoundPredicate,
+            predicate: predicate,
+            animation: .default
+        )
+        
+        // Initialize fetch request for overdue tasks
+        let todayStart = Calendar.current.startOfDay(for: Date())
+        let overduePredicate = NSPredicate(format: "type == %d AND isComplete == NO AND date < %@",
+                                          LogEntryType.task.rawValue,
+                                          todayStart as NSDate)
+        
+        self._overdueTasks = FetchRequest<LogEntry>(
+            sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.date, ascending: true)],
+            predicate: overduePredicate,
             animation: .default
         )
     }
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Status filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        ForEach(TaskStatus.allCases) { status in
-                            FilterChip(
-                                title: status.rawValue,
-                                count: countForStatus(status),
-                                isSelected: filterStatus == status,
-                                action: { filterStatus = status }
-                            )
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                }
+            ZStack {
+                Color.appBackground.ignoresSafeArea()
                 
-                // Client filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
-                        Button(action: { selectedClient = nil }) {
-                            HStack {
-                                Text("All Clients")
-                                    .font(.appSubheadline)
-                                
-                                if selectedClient == nil {
-                                    Image(systemName: "checkmark")
-                                        .font(.caption)
-                                }
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(selectedClient == nil ? Color.appAccent.opacity(0.1) : Color.cardBackground)
-                            .foregroundColor(selectedClient == nil ? .appAccent : .primaryText)
-                            .cornerRadius(8)
+                ScrollView {
+                    VStack(spacing: 0) {
+                        // Week view header
+                        weekCalendarHeader
+                        
+                        Divider()
+                            .padding(.horizontal)
+                        
+                        // Display selected day name
+                        HStack {
+                            Text(dayFormatter.string(from: selectedDate))
+                                .font(.appSubheadline)
+                                .foregroundColor(.secondaryText)
+                                .padding(.leading)
+                                .padding(.top, 16)
+                            Spacer()
                         }
                         
-                        ForEach(clientsWithTasks) { client in
-                            Button(action: { selectedClient = client }) {
-                                HStack {
-                                    Text(client.name ?? "Client")
-                                        .font(.appSubheadline)
-                                    
-                                    if selectedClient == client {
-                                        Image(systemName: "checkmark")
-                                            .font(.caption)
-                                    }
+                        // Scheduled tasks section
+                        if tasksForSelectedDay.isEmpty && overdueTasks.isEmpty {
+                            if undatedTasks.isEmpty {
+                                // Only show empty day view if both scheduled and unscheduled tasks are empty
+                                emptyDayView
+                            } else {
+                                // If there are unscheduled tasks, show a simpler message
+                                VStack(spacing: 12) {
+                                    Text("Nothing planned for this day yet.")
+                                        .font(.body)
+                                        .foregroundColor(.secondaryText)
+                                        .multilineTextAlignment(.center)
+                                        .padding(.horizontal, 40)
+                                        .padding(.vertical, 20)
                                 }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(selectedClient == client ? Color.appAccent.opacity(0.1) : Color.cardBackground)
-                                .foregroundColor(selectedClient == client ? .appAccent : .primaryText)
-                                .cornerRadius(8)
                             }
+                        } else {
+                            taskList
                         }
+                        
+                        // Only show unscheduled section if there are unscheduled tasks
+                        if !undatedTasks.isEmpty {
+                            // Unscheduled tasks header
+                            HStack {
+                                Text("Unscheduled")
+                                    .font(.headline)
+                                    .foregroundColor(.primaryText)
+                                    .padding(.leading)
+                                    .padding(.top, 24)
+                                    .padding(.bottom, 8)
+                                Spacer()
+                            }
+                            
+                            // Unscheduled tasks list
+                            unscheduledTaskList
+                        }
+                        
+                        // Add spacing at bottom for floating button
+                        Spacer(minLength: 80)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
                 }
-                .background(Color.appBackground)
                 
-                // Tasks list
-                if tasks.isEmpty {
-                    emptyStateView
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(tasks) { task in
-                                TaskRow(task: task)
-                                    .padding(.horizontal)
-                            }
+                // Single floating action button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: { showingAddTask = true }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
+                                .background(
+                                    Circle()
+                                        .fill(Color.appAccent)
+                                        .shadow(color: Color.appAccent.opacity(0.3), radius: 5, x: 0, y: 3)
+                                )
                         }
-                        .padding(.vertical)
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
                     }
-                    .background(Color.appBackground)
                 }
             }
-            .background(Color.appBackground)
+            .onChange(of: selectedDate) { oldValue, newValue in
+                updateFetchRequest()
+                // Toggle the force update flag to trigger a view refresh
+                forceUpdate.toggle()
+            }
+            .id(forceUpdate) // Force view to update when this changes
             .navigationTitle("Tasks")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddTask) {
-                // Pre-select the task type
-                LogEntryFormView(selectedType: .task, client: selectedClient)
+                QuickAddView(initialEntryType: .task, initialDate: selectedDate)
+                    .environment(\.managedObjectContext, viewContext)
+                    .presentationDragIndicator(.hidden)
+                    .presentationDetents([.height(420)])
+                    .presentationBackground(Color(uiColor: .systemBackground))
+                    .presentationCornerRadius(24)
+                    .interactiveDismissDisabled(false)
+            }
+            .sheet(isPresented: $showMonthPicker) {
+                MonthPickerView(selectedDate: $selectedDate)
+                    .presentationDetents([.medium])
+                    .environment(\.managedObjectContext, viewContext)
             }
         }
     }
     
-    private var emptyStateView: some View {
-        VStack(spacing: 24) {
-            Image(systemName: "checkmark.circle")
-                .font(.system(size: 70))
-                .foregroundColor(Color.secondaryText.opacity(0.3))
-                .padding(.bottom, 10)
-                .padding(.top, 60)
+    // Week calendar header that shows a single week
+    private var weekCalendarHeader: some View {
+        VStack(spacing: 16) {
+            // Month and year with calendar button
+            HStack {
+                Text(monthYearFormatter.string(from: selectedDate))
+                    .font(.system(size: 28, weight: .semibold))
+                    .foregroundColor(.primaryText)
+                
+                Spacer()
+                
+                Button(action: {
+                    showMonthPicker = true
+                }) {
+                    Image(systemName: "calendar")
+                        .font(.headline)
+                        .foregroundColor(.appAccent)
+                        .padding(8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.appAccent, lineWidth: 1.5)
+                        )
+                }
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
             
-            Text("No Tasks Found")
-                .font(.appTitle2)
+            // Week view
+            HStack(spacing: 0) {
+                ForEach(Array(zip(weekDates, ["S", "M", "T", "W", "T", "F", "S"])), id: \.0) { date, dayLabel in
+                    let isToday = calendar.isDateInToday(date)
+                    let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+                    
+                    Button(action: {
+                        selectedDate = date
+                    }) {
+                        VStack(spacing: 4) {
+                            // Day letter
+                            Text(dayLabel)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondaryText.opacity(0.6))
+                            
+                            // Day number
+                            Text("\(calendar.component(.day, from: date))")
+                                .font(.system(size: 18, weight: isSelected ? .bold : .regular))
+                                .foregroundColor(isSelected ? .white : (isToday ? .appAccent : .primaryText))
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    Circle()
+                                        .fill(isSelected ? Color.appAccent : (isToday ? Color.appAccent.opacity(0.1) : Color.clear))
+                                )
+                            
+                            // Task indicator dots
+                            if hasTasksOnDay(date) {
+                                Circle()
+                                    .fill(isSelected ? Color.white.opacity(0.8) : Color.appAccent)
+                                    .frame(width: 5, height: 5)
+                            } else {
+                                Spacer()
+                                    .frame(height: 5)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                    }
+                }
+            }
+            .padding(.bottom, 16)
+        }
+        .background(Color.appBackground)
+    }
+    
+    // Scheduled tasks list
+    private var taskList: some View {
+        LazyVStack(spacing: 12, pinnedViews: []) {
+            // Always show overdue tasks
+            if !overdueTasks.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Overdue header
+                    Text("Overdue")
+                        .font(.appSubheadline)
+                        .foregroundColor(.red)
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                    
+                    // Overdue tasks
+                    ForEach(overdueTasks) { task in
+                        TaskCardView(task: task, isOverdue: true)
+                            .padding(.horizontal)
+                    }
+                }
+            }
+            
+            // Group tasks by time of day if not today, or use "Due Today" for today's tasks
+            if !tasksForSelectedDay.isEmpty {
+                // Check if selected date is today
+                let isToday = calendar.isDateInToday(selectedDate)
+                
+                if isToday {
+                    // Today's tasks get a special header
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Due Today")
+                            .font(.appSubheadline)
+                            .foregroundColor(.appAccent)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                        
+                        // Today's tasks
+                        ForEach(tasksForSelectedDay) { task in
+                            TaskCardView(task: task)
+                                .padding(.horizontal)
+                        }
+                    }
+                } else {
+                    // Group and sort tasks by morning/afternoon/evening for other days
+                    let groupedTasks = groupTasksByTime(tasksForSelectedDay)
+                    
+                    // Define a custom sort order for time groups
+                    let timeOrder = ["Morning", "Afternoon", "Evening"]
+                    
+                    // Use the custom order to sort the groups
+                    ForEach(timeOrder.filter { groupedTasks[$0]?.isEmpty == false }, id: \.self) { timeGroup in
+                        if let tasks = groupedTasks[timeGroup], !tasks.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                // Time group header (Morning, Afternoon, Evening)
+                                Text(timeGroup)
+                                    .font(.appSubheadline)
+                                    .foregroundColor(.secondaryText)
+                                    .padding(.horizontal)
+                                    .padding(.top, 8)
+                                
+                                // Tasks in this time group
+                                ForEach(tasks) { task in
+                                    TaskCardView(task: task)
+                                        .padding(.horizontal)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 12)
+    }
+    
+    // Unscheduled tasks list
+    private var unscheduledTaskList: some View {
+        LazyVStack(spacing: 12) {
+            ForEach(undatedTasks) { task in
+                UnscheduledTaskCardView(
+                    task: task, 
+                    assignTaskToToday: assignTaskToToday
+                )
+                .padding(.horizontal)
+            }
+        }
+        .padding(.vertical, 12)
+    }
+    
+    private var emptyDayView: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "checkmark.circle")
+                .font(.system(size: 50))
+                .foregroundColor(.secondaryText.opacity(0.3))
+                .padding(20)
+            
+            Text("No Tasks")
+                .font(.title2)
+                .fontWeight(.bold)
                 .foregroundColor(.primaryText)
             
-            Text(emptyStateMessage)
-                .font(.appBody)
+            Text("Nothing planned for this day yet.")
+                .font(.body)
                 .foregroundColor(.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
+                .padding(.bottom, 20)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+    }
+    
+    // Function to check if a day has any tasks
+    private func hasTasksOnDay(_ date: Date) -> Bool {
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)?.addingTimeInterval(-1) ?? startOfDay
+        
+        return allTasks.contains { task in
+            guard let taskDate = task.date else { return false }
+            return taskDate >= startOfDay && taskDate <= endOfDay
+        }
+    }
+    
+    // Function to count tasks on a specific day
+    private func countTasksOnDay(_ date: Date) -> Int {
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)?.addingTimeInterval(-1) ?? startOfDay
+        
+        return allTasks.filter { task in
+            guard let taskDate = task.date else { return false }
+            return taskDate >= startOfDay && taskDate <= endOfDay
+        }.count
+    }
+    
+    // Function to group tasks by time of day
+    private func groupTasksByTime(_ tasks: FetchedResults<LogEntry>) -> [String: [LogEntry]] {
+        var groupedTasks: [String: [LogEntry]] = [
+            "Morning": [],
+            "Afternoon": [],
+            "Evening": []
+        ]
+        
+        for task in tasks {
+            guard let date = task.date else { continue }
             
-            Button(action: { showingAddTask = true }) {
-                Text("Add New Task")
-                    .font(.appHeadline)
-                    .frame(height: 24)
+            let hour = calendar.component(.hour, from: date)
+            
+            if hour < 12 {
+                groupedTasks["Morning"]?.append(task)
+            } else if hour < 17 {
+                groupedTasks["Afternoon"]?.append(task)
+            } else {
+                groupedTasks["Evening"]?.append(task)
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .padding(.horizontal, 40)
-            .padding(.top, 12)
-            
-            Spacer()
         }
+        
+        return groupedTasks
     }
     
-    private var emptyStateMessage: String {
-        if let client = selectedClient {
-            return "You don't have any \(filterStatus == .completed ? "completed" : filterStatus == .open ? "open" : "") tasks for \(client.name ?? "this client")."
-        } else {
-            return "You don't have any \(filterStatus == .completed ? "completed" : filterStatus == .open ? "open" : "") tasks yet."
-        }
+    private func updateFetchRequest() {
+        let startOfDay = calendar.startOfDay(for: selectedDate)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)?.addingTimeInterval(-1) ?? startOfDay
+        
+        // Create new predicate
+        let predicate = NSPredicate(format: "type == %d AND date >= %@ AND date <= %@", 
+                                   LogEntryType.task.rawValue,
+                                   startOfDay as NSDate,
+                                   endOfDay as NSDate)
+        
+        // Update fetch request for tasks on selected day
+        tasksForSelectedDay.nsPredicate = predicate
+        
+        // Refresh overdue tasks fetch request
+        let today = calendar.startOfDay(for: Date())
+        let overduePredicate = NSPredicate(format: "type == %d AND isComplete == NO AND date < %@", 
+                                          LogEntryType.task.rawValue, 
+                                          today as NSDate)
+        
+        // Update the overdue tasks
+        overdueTasks.nsPredicate = overduePredicate
     }
     
-    private var clientsWithTasks: [Client] {
-        let fetchRequest: NSFetchRequest<Client> = Client.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "ANY logEntries.type == %d", LogEntryType.task.rawValue)
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \Client.name, ascending: true)]
+    private func assignTaskToToday(_ task: LogEntry) {
+        let today = calendar.startOfDay(for: Date())
+        let defaultTime = calendar.date(bySettingHour: 9, minute: 0, second: 0, of: today) ?? today
         
-        do {
-            return try viewContext.fetch(fetchRequest)
-        } catch {
-            print("Error fetching clients with tasks: \(error)")
-            return []
-        }
-    }
-    
-    private func countForStatus(_ status: TaskStatus) -> Int {
-        let fetchRequest: NSFetchRequest<LogEntry> = LogEntry.fetchRequest()
-        var predicates: [NSPredicate] = []
-        
-        // Always filter for task type
-        predicates.append(NSPredicate(format: "type == %d", LogEntryType.task.rawValue))
-        
-        // Filter by completion status
-        switch status {
-        case .open:
-            predicates.append(NSPredicate(format: "isComplete == NO"))
-        case .completed:
-            predicates.append(NSPredicate(format: "isComplete == YES"))
-        case .all:
-            break
-        }
-        
-        // Filter by client if selected
-        if let client = selectedClient {
-            predicates.append(NSPredicate(format: "client == %@", client))
-        }
-        
-        // Combine predicates
-        fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        
-        do {
-            return try viewContext.count(for: fetchRequest)
-        } catch {
-            print("Error counting tasks: \(error)")
-            return 0
+        withAnimation {
+            task.date = defaultTime
+            do {
+                try viewContext.save()
+                // Update fetch requests after saving
+                updateFetchRequest()
+            } catch {
+                print("Error saving task date: \(error)")
+            }
         }
     }
 }
 
-struct TaskRow: View {
+// Helper view for task cards
+struct TaskCardView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @ObservedObject var task: LogEntry
     @State private var isComplete: Bool = false
+    var isOverdue: Bool = false
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
     
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .none
+        formatter.dateFormat = "MMM d"
+        return formatter
+    }()
+    
+    var body: some View {
+        NavigationLink(destination: EntryDetailView(entry: task)) {
+            HStack(spacing: 12) {
+                // Checkbox
+                Button(action: toggleCompletion) {
+                    ZStack {
+                        Circle()
+                            .stroke(isComplete ? Color.appAccent : (isOverdue ? Color.red : Color.gray.opacity(0.4)), lineWidth: 2)
+                            .frame(width: 24, height: 24)
+                        
+                        if isComplete {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.appAccent)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    // Task description and time in a single row
+                    HStack {
+                        Text(task.desc ?? "")
+                            .font(.appHeadline)
+                            .foregroundColor(isComplete ? .secondaryText : (isOverdue ? .red : .primaryText))
+                            .strikethrough(isComplete)
+                        
+                        Spacer(minLength: 8)
+                        
+                        if let date = task.date {
+                            Text(isOverdue ? dateFormatter.string(from: date) : timeFormatter.string(from: date))
+                                .font(.appCaption)
+                                .foregroundColor(isOverdue ? .red : .secondaryText)
+                        }
+                    }
+                    
+                    // Client info
+                    if let client = task.client {
+                        HStack {
+                            Text(client.name ?? "Client")
+                                .font(.appCaption)
+                                .foregroundColor(.secondaryText)
+                            
+                            if let tag = task.tag, !tag.isEmpty {
+                                Text("•")
+                                    .font(.appCaption)
+                                    .foregroundColor(.secondaryText.opacity(0.5))
+                                
+                                Text(tag)
+                                    .font(.appCaption)
+                                    .foregroundColor(.secondaryText)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(Color.cardBackground)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(isOverdue ? Color.red.opacity(0.2) : Color.gray.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
+        }
+        .buttonStyle(PlainButtonStyle())
+        .onAppear {
+            isComplete = task.isComplete
+        }
+    }
+    
+    private func toggleCompletion() {
+        isComplete.toggle()
+        task.isComplete = isComplete
+        
+        do {
+            try viewContext.save()
+            
+            // Add haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+        } catch {
+            print("Error saving task completion: \(error)")
+        }
+    }
+}
+
+// Helper view for unscheduled task cards
+struct UnscheduledTaskCardView: View {
+    @Environment(\.managedObjectContext) private var viewContext
+    @ObservedObject var task: LogEntry
+    @State private var isComplete: Bool = false
+    var assignTaskToToday: (LogEntry) -> Void
+    
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
         return formatter
     }()
     
@@ -262,45 +618,57 @@ struct TaskRow: View {
                 }
                 .buttonStyle(.plain)
                 
+                // Task info - main row has task description and creation time
                 VStack(alignment: .leading, spacing: 4) {
-                    // Task description
-                    Text(task.desc ?? "")
-                        .font(.appHeadline)
-                        .foregroundColor(isComplete ? .secondaryText : .primaryText)
-                        .strikethrough(isComplete)
-                    
-                    // Client and date
                     HStack {
-                        if let client = task.client {
-                            Text(client.name ?? "Client")
-                                .font(.appCaption)
-                                .foregroundColor(.secondaryText)
-                        }
+                        Text(task.desc ?? "")
+                            .font(.appHeadline)
+                            .foregroundColor(isComplete ? .secondaryText : .primaryText)
+                            .strikethrough(isComplete)
+                            .lineLimit(1)
                         
-                        if let date = task.date {
-                            Text("•")
-                                .font(.appCaption)
-                                .foregroundColor(.secondaryText.opacity(0.5))
-                            
-                            Text(dateFormatter.string(from: date))
+                        Spacer(minLength: 8)
+                        
+                        if let creationDate = task.value(forKey: "creationDate") as? Date {
+                            Text(timeFormatter.string(from: creationDate))
                                 .font(.appCaption)
                                 .foregroundColor(.secondaryText)
                         }
                     }
+                    
+                    // Client info
+                    if let client = task.client {
+                        HStack {
+                            Text(client.name ?? "Client")
+                                .font(.appCaption)
+                                .foregroundColor(.secondaryText)
+                            
+                            if let tag = task.tag, !tag.isEmpty {
+                                Text("•")
+                                    .font(.appCaption)
+                                    .foregroundColor(.secondaryText.opacity(0.5))
+                                
+                                Text(tag)
+                                    .font(.appCaption)
+                                    .foregroundColor(.secondaryText)
+                            }
+                        }
+                    }
                 }
                 
-                Spacer()
-                
-                // Tag if exists
-                if let tag = task.tag, !tag.isEmpty {
-                    Text(tag)
-                        .font(.appCaption)
-                        .foregroundColor(.secondaryText)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
+                // "Today" button for quick scheduling
+                Button(action: {
+                    assignTaskToToday(task)
+                }) {
+                    Text("Today")
+                        .font(.caption.bold())
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.appAccent)
+                        .cornerRadius(12)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
             .padding()
             .background(Color.cardBackground)
@@ -333,43 +701,165 @@ struct TaskRow: View {
     }
 }
 
-struct FilterChip: View {
-    let title: String
-    let count: Int
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Text(title)
-                    .font(.appSubheadline)
-                
-                if count > 0 {
-                    Text("\(count)")
-                        .font(.appCaption)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule()
-                                .fill(isSelected ? Color.white.opacity(0.3) : Color.appAccent.opacity(0.1))
-                        )
-                        .foregroundColor(isSelected ? .white : .appAccent)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(isSelected ? Color.appAccent : Color.cardBackground)
-                    .shadow(color: isSelected ? Color.appAccent.opacity(0.3) : Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
-            )
-            .foregroundColor(isSelected ? .white : .primaryText)
-        }
-    }
-}
-
 #Preview {
     TasksView()
         .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+}
+
+// Month picker view for selecting a specific date
+struct MonthPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var selectedDate: Date
+    
+    @State private var displayedMonth: Date
+    
+    private let calendar = Calendar.current
+    private let daysOfWeek = ["S", "M", "T", "W", "T", "F", "S"]
+    
+    init(selectedDate: Binding<Date>) {
+        self._selectedDate = selectedDate
+        self._displayedMonth = State(initialValue: Calendar.current.startOfDay(for: selectedDate.wrappedValue))
+    }
+    
+    private let monthYearFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter
+    }()
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 20) {
+                // Month navigation
+                HStack {
+                    Button(action: previousMonth) {
+                        Image(systemName: "chevron.left")
+                            .foregroundColor(.appAccent)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(monthYearFormatter.string(from: displayedMonth))
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primaryText)
+                    
+                    Spacer()
+                    
+                    Button(action: nextMonth) {
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(.appAccent)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+                
+                // Day of week headers
+                HStack(spacing: 0) {
+                    ForEach(daysOfWeek, id: \.self) { day in
+                        Text(day)
+                            .font(.callout)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondaryText)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .padding(.horizontal)
+                
+                // Calendar grid
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 8) {
+                    ForEach(daysInMonth(), id: \.self) { day in
+                        if day.day != 0 {
+                            Button(action: {
+                                selectedDate = day.date
+                                dismiss()
+                            }) {
+                                Text("\(day.day)")
+                                    .font(.system(size: 18))
+                                    .fontWeight(isSelected(day.date) ? .bold : .regular)
+                                    .foregroundColor(isSelected(day.date) ? .white : (isToday(day.date) ? .appAccent : .primaryText))
+                                    .frame(width: 40, height: 40)
+                                    .background(
+                                        Circle()
+                                            .fill(isSelected(day.date) ? Color.appAccent : (isToday(day.date) ? Color.appAccent.opacity(0.1) : Color.clear))
+                                    )
+                            }
+                        } else {
+                            Text("")
+                                .frame(width: 40, height: 40)
+                        }
+                    }
+                }
+                
+                Spacer()
+            }
+            .navigationTitle("Select Date")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .foregroundColor(.appAccent)
+                }
+            }
+        }
+    }
+    
+    // Check if a date is today
+    private func isToday(_ date: Date) -> Bool {
+        return calendar.isDateInToday(date)
+    }
+    
+    // Check if a date is selected
+    private func isSelected(_ date: Date) -> Bool {
+        return calendar.isDate(date, inSameDayAs: selectedDate)
+    }
+    
+    // Go to previous month
+    private func previousMonth() {
+        if let newMonth = calendar.date(byAdding: .month, value: -1, to: displayedMonth) {
+            displayedMonth = newMonth
+        }
+    }
+    
+    // Go to next month
+    private func nextMonth() {
+        if let newMonth = calendar.date(byAdding: .month, value: 1, to: displayedMonth) {
+            displayedMonth = newMonth
+        }
+    }
+    
+    // Generate days in the month
+    private func daysInMonth() -> [CalendarDay] {
+        var days = [CalendarDay]()
+        
+        let range = calendar.range(of: .day, in: .month, for: displayedMonth)!
+        let numDays = range.count
+        
+        // Get the first day of the month
+        let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: displayedMonth))!
+        
+        // Get the weekday of the first day (0 = Sunday, 1 = Monday, etc.)
+        let firstWeekday = calendar.component(.weekday, from: firstDay) - 1
+        
+        // Add empty days for the beginning of the month
+        for _ in 0..<firstWeekday {
+            days.append(CalendarDay(day: 0, date: Date()))
+        }
+        
+        // Add the days of the month
+        for day in 1...numDays {
+            let date = calendar.date(byAdding: .day, value: day - 1, to: firstDay)!
+            days.append(CalendarDay(day: day, date: date))
+        }
+        
+        return days
+    }
+    
+    // Helper struct for calendar days
+    struct CalendarDay: Hashable {
+        let day: Int
+        let date: Date
+    }
 } 

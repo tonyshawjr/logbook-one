@@ -8,27 +8,66 @@ struct TaskDatePickerView: View {
     @State private var monthDisplay: Date
     @State private var showTimeSelection: Bool = false
     @State private var selectedTime: Date
+    @State private var selectedTimeOption: TimeOption = .morning
+    
+    // Predefined time options for quick selection
+    enum TimeOption: String, CaseIterable, Identifiable {
+        case morning = "Morning"
+        case afternoon = "Afternoon"
+        case evening = "Evening"
+        case custom = "Custom"
+        
+        var id: String { self.rawValue }
+        
+        var hour: Int {
+            switch self {
+            case .morning: return 9
+            case .afternoon: return 14
+            case .evening: return 19
+            case .custom: return 0 // Custom will use the actual time picker
+            }
+        }
+        
+        var minute: Int {
+            return 0
+        }
+    }
     
     init(selectedDate: Binding<Date>) {
         self._selectedDate = selectedDate
         self._monthDisplay = State(initialValue: selectedDate.wrappedValue)
         self._selectedTime = State(initialValue: selectedDate.wrappedValue)
         
-        // Check if the date has a non-default time
+        // Check if the date has a time that matches one of our preset options
         let calendar = Calendar.current
-        let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedDate.wrappedValue)
+        let hour = calendar.component(.hour, from: selectedDate.wrappedValue)
         
-        // If time is not midnight, show time selection by default
+        // Find the matching time option or set to custom
+        let timeOption: TimeOption
+        if hour >= 7 && hour < 12 {
+            timeOption = .morning
+        } else if hour >= 12 && hour < 17 {
+            timeOption = .afternoon
+        } else if hour >= 17 {
+            timeOption = .evening
+        } else {
+            timeOption = .custom
+        }
+        
+        self._selectedTimeOption = State(initialValue: timeOption)
+        
+        // Check if time selection should be shown by default
+        let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedDate.wrappedValue)
         let hasCustomTime = !(timeComponents.hour == 0 && timeComponents.minute == 0) && 
-                            !(timeComponents.hour == 9 && timeComponents.minute == 0)
+                           !(timeComponents.hour == 9 && timeComponents.minute == 0)
         self._showTimeSelection = State(initialValue: hasCustomTime)
     }
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 32) {
+            VStack(spacing: 24) {
                 // Quick options
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     // Today button
                     dateOptionButton(
                         label: "Today",
@@ -77,13 +116,13 @@ struct TaskDatePickerView: View {
                     
                     Button(action: previousMonth) {
                         Image(systemName: "chevron.left")
-                            .foregroundColor(.green)
+                            .foregroundColor(.appAccent)
                             .padding(8)
                     }
                     
                     Button(action: nextMonth) {
                         Image(systemName: "chevron.right")
-                            .foregroundColor(.green)
+                            .foregroundColor(.appAccent)
                             .padding(8)
                     }
                 }
@@ -106,61 +145,72 @@ struct TaskDatePickerView: View {
                 .padding(.horizontal)
                 
                 // Time selection toggle
-                Toggle(isOn: $showTimeSelection.animation()) {
-                    Text("Set a specific time")
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                }
-                .padding(.horizontal)
-                .toggleStyle(SwitchToggleStyle(tint: .green))
-                .onChange(of: showTimeSelection) { oldValue, newValue in
-                    if newValue {
-                        // When enabling time selection, initialize with current time if at default
-                        let calendar = Calendar.current
-                        let timeComponents = calendar.dateComponents([.hour, .minute], from: selectedDate)
-                        
-                        if (timeComponents.hour == 0 && timeComponents.minute == 0) ||
-                           (timeComponents.hour == 9 && timeComponents.minute == 0) {
-                            // If currently at a default time, use current time
-                            let now = Date()
-                            let nowTimeComponents = calendar.dateComponents([.hour, .minute], from: now)
-                            
-                            var dateComponents = calendar.dateComponents([.year, .month, .day], from: selectedDate)
-                            dateComponents.hour = nowTimeComponents.hour
-                            dateComponents.minute = nowTimeComponents.minute
-                            
-                            if let dateWithCurrentTime = calendar.date(from: dateComponents) {
-                                selectedTime = dateWithCurrentTime
-                                selectedDate = dateWithCurrentTime
-                            }
-                        } else {
-                            // If a custom time was already set, keep it
-                            selectedTime = selectedDate
-                        }
-                    } else {
-                        // When disabling time selection, set to default 9 AM
-                        let calendar = Calendar.current
-                        var components = calendar.dateComponents([.year, .month, .day], from: selectedDate)
-                        components.hour = 9
-                        components.minute = 0
-                        
-                        if let defaultTime = calendar.date(from: components) {
-                            selectedDate = defaultTime
-                            selectedTime = defaultTime
+                VStack(spacing: 12) {
+                    Toggle(isOn: $showTimeSelection.animation()) {
+                        Text("Set a specific time")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: .appAccent))
+                    .padding(.horizontal)
+                    .onChange(of: showTimeSelection) { oldValue, newValue in
+                        if !newValue {
+                            // When disabling time selection, set to default 9 AM
+                            setDefaultTime()
                         }
                     }
-                }
-                
-                // Time picker (only shown if toggle is on)
-                if showTimeSelection {
-                    DatePicker("", selection: $selectedTime, displayedComponents: .hourAndMinute)
-                        .datePickerStyle(WheelDatePickerStyle())
-                        .labelsHidden()
-                        .frame(maxHeight: 150)
-                        .onChange(of: selectedTime) { oldValue, newValue in
-                            // Keep the date part from selectedDate and time part from selectedTime
-                            updateDateWithSelectedTime()
+                    
+                    // Time options (only shown if toggle is on)
+                    if showTimeSelection {
+                        // Quick time options
+                        HStack(spacing: 8) {
+                            ForEach(TimeOption.allCases) { option in
+                                Button(action: {
+                                    if option != .custom {
+                                        withAnimation {
+                                            selectedTimeOption = option
+                                            setTimeFromOption(option)
+                                        }
+                                    } else {
+                                        withAnimation {
+                                            selectedTimeOption = .custom
+                                        }
+                                    }
+                                }) {
+                                    Text(option.rawValue)
+                                        .font(.subheadline)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            Capsule()
+                                                .fill(selectedTimeOption == option ? 
+                                                     Color.appAccent : Color(UIColor.secondarySystemBackground))
+                                        )
+                                        .foregroundColor(selectedTimeOption == option ? .white : .primary)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
                         }
+                        .padding(.horizontal)
+                        
+                        // Custom time picker (only shown if Custom is selected)
+                        if selectedTimeOption == .custom {
+                            HStack {
+                                Spacer()
+                                
+                                // Compact time picker
+                                DatePicker("", selection: $selectedTime, displayedComponents: .hourAndMinute)
+                                    .labelsHidden()
+                                    .frame(maxWidth: 150)
+                                    .onChange(of: selectedTime) { oldValue, newValue in
+                                        updateDateWithSelectedTime()
+                                    }
+                                
+                                Spacer()
+                            }
+                            .padding(.top, 8)
+                        }
+                    }
                 }
                 
                 Spacer()
@@ -171,15 +221,45 @@ struct TaskDatePickerView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
-                        // If showing time selection, ensure we use the currently selected time
-                        if showTimeSelection {
+                        // If showing time selection and custom time is selected, ensure we use it
+                        if showTimeSelection && selectedTimeOption == .custom {
                             updateDateWithSelectedTime()
+                        } else if showTimeSelection {
+                            // Use the selected time option
+                            setTimeFromOption(selectedTimeOption)
                         }
                         dismiss()
                     }
-                    .foregroundColor(.green)
+                    .foregroundColor(.appAccent)
                 }
             }
+        }
+    }
+    
+    // Helper to set time from the selected option
+    private func setTimeFromOption(_ option: TimeOption) {
+        let calendar = Calendar.current
+        var dateComponents = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+        dateComponents.hour = option.hour
+        dateComponents.minute = option.minute
+        
+        if let newDate = calendar.date(from: dateComponents) {
+            selectedDate = newDate
+            selectedTime = newDate
+        }
+    }
+    
+    // Set default time (9 AM)
+    private func setDefaultTime() {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+        components.hour = 9
+        components.minute = 0
+        
+        if let defaultTime = calendar.date(from: components) {
+            selectedDate = defaultTime
+            selectedTime = defaultTime
+            selectedTimeOption = .morning
         }
     }
     
@@ -256,21 +336,21 @@ struct TaskDatePickerView: View {
     // Quick date option button
     private func dateOptionButton(label: String, icon: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(spacing: 12) {
+            VStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(.system(size: 16))
                 
                 Text(label)
-                    .font(.system(size: 16))
+                    .font(.system(size: 14))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(isSelected ? Color.green.opacity(0.15) : Color(UIColor.secondarySystemBackground))
-            .foregroundColor(isSelected ? .green : .primary)
-            .cornerRadius(16)
+            .padding(.vertical, 12)
+            .background(isSelected ? Color.appAccent.opacity(0.15) : Color(UIColor.secondarySystemBackground))
+            .foregroundColor(isSelected ? .appAccent : .primary)
+            .cornerRadius(12)
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? Color.green : Color.clear, lineWidth: 2)
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(isSelected ? Color.appAccent : Color.clear, lineWidth: 1.5)
             )
         }
     }
@@ -318,11 +398,11 @@ struct CalendarGridView: View {
                         }) {
                             Text("\(day.day)")
                                 .font(.system(size: 18))
-                                .foregroundColor(isSelected(day.date) ? .white : (isToday(day.date) ? .green : .primary))
+                                .foregroundColor(isSelected(day.date) ? .white : (isToday(day.date) ? .appAccent : .primary))
                                 .frame(width: 40, height: 40)
                                 .background(
                                     Circle()
-                                        .fill(isSelected(day.date) ? Color.green : Color.clear)
+                                        .fill(isSelected(day.date) ? Color.appAccent : Color.clear)
                                 )
                         }
                     } else {
@@ -395,6 +475,7 @@ struct QuickAddView: View {
     @State private var showDatePicker: Bool = false
     @State private var showingSavedAnimation = false
     @State private var currentPrompt: String = ""
+    @State private var keyboardIsShown = false
     
     // For auto-focusing the text field
     @FocusState private var isDescriptionFocused: Bool
@@ -437,219 +518,250 @@ struct QuickAddView: View {
     init() {
         let savedType = UserDefaults.standard.integer(forKey: "lastUsedEntryType")
         _selectedType = State(initialValue: LogEntryType(rawValue: Int16(savedType)) ?? .task)
+        _showDueDate = State(initialValue: false) // Explicitly start with no due date
     }
     
     // Initialize with a specific entry type (for context-aware quick add)
     init(initialEntryType: LogEntryType) {
         _selectedType = State(initialValue: initialEntryType)
+        _showDueDate = State(initialValue: false) // Default to false for unscheduled tasks
         // Still save this as the last used type
         UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
     }
     
+    // Initialize with a specific entry type and initial date (for tasks)
+    init(initialEntryType: LogEntryType, initialDate: Date) {
+        _selectedType = State(initialValue: initialEntryType)
+        _dueDate = State(initialValue: initialDate)
+        _showDueDate = State(initialValue: true) // When initialized with a date, set showDueDate to true
+        
+        // Save as last used type
+        UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
+    }
+    
     var body: some View {
-        VStack(spacing: 0) {
-            // Header with close button and tabs at the top
-            HStack {
-                // Type selector - Simple row of options
-                HStack(spacing: 8) {
-                    ForEach(LogEntryType.allCases) { type in
-                        Button(action: {
-                            withAnimation {
-                                selectedType = type
-                                lastUsedEntryType = Int(type.rawValue)
-                                showDueDate = type == .task
-                                isDescriptionFocused = true
-                                // Update the prompt when changing type
-                                currentPrompt = getRandomPrompt(for: type)
+        ZStack {
+            // Full-screen dark background that extends to edges and corners
+            Color(uiColor: .systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header with close button and tabs at the top
+                HStack {
+                    // Type selector - Simple row of options
+                    HStack(spacing: 8) {
+                        ForEach(LogEntryType.allCases) { type in
+                            Button(action: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    selectedType = type
+                                    lastUsedEntryType = Int(type.rawValue)
+                                    showDueDate = type == .task
+                                    // Update the prompt when changing type
+                                    currentPrompt = getRandomPrompt(for: type)
+                                }
+                                // Focus after animation completes
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                    isDescriptionFocused = true
+                                }
+                            }) {
+                                VStack(spacing: 8) {
+                                    Image(systemName: iconForType(type))
+                                        .font(.system(size: 20))
+                                        .foregroundColor(selectedType == type ? .white : .appAccent)
+                                    
+                                    Text(type.displayName)
+                                        .font(.subheadline)
+                                        .fontWeight(selectedType == type ? .semibold : .regular)
+                                        .foregroundColor(selectedType == type ? .white : .appAccent)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(selectedType == type ? Color.appAccent : Color.appAccent.opacity(0.05))
+                                )
                             }
-                        }) {
-                            VStack(spacing: 8) {
-                                Image(systemName: iconForType(type))
-                                    .font(.system(size: 20))
-                                    .foregroundColor(selectedType == type ? .white : .green)
-                                
-                                Text(type.displayName)
-                                    .font(.subheadline)
-                                    .fontWeight(selectedType == type ? .semibold : .regular)
-                                    .foregroundColor(selectedType == type ? .white : .green)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .fill(selectedType == type ? Color.green : Color.green.opacity(0.05))
-                            )
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: { dismiss() }) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.appAccent)
+                                .frame(width: 44, height: 44)
+                            
+                            Image(systemName: "xmark")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundColor(.white)
                         }
                     }
                 }
+                .padding(.horizontal)
+                .padding(.top, keyboardIsShown ? 12 : 16)
+                
+                // Description field with fixed height
+                TextField("", text: $description, axis: .vertical)
+                    .placeholder(when: description.isEmpty) {
+                        Text(currentPrompt)
+                            .foregroundColor(.secondary)
+                    }
+                    .font(.title3)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                    .focused($isDescriptionFocused)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        if !description.isEmpty {
+                            saveEntry()
+                        }
+                    }
+                    .frame(height: 120)
+                    .padding(.bottom, 8)
                 
                 Spacer()
                 
-                Button(action: { dismiss() }) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.green)
-                            .frame(width: 44, height: 44)
+                // Bottom fields area with fixed heights
+                VStack(spacing: 16) {
+                    // Payment fields & client/date selection
+                    HStack(spacing: 16) {
+                        // Client selection for all types
+                        Button(action: {
+                            showClientPicker = true
+                        }) {
+                            HStack {
+                                Text(selectedClient?.name ?? "Select Client")
+                                    .foregroundColor(selectedClient != nil ? .primary : .secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                            .padding(.horizontal, 12)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(8)
+                        }
                         
-                        Image(systemName: "xmark")
-                            .font(.system(size: 20, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                }
-            }
-            .padding(.horizontal)
-            .padding(.top, 16)
-            
-            // Description field - immediately after tabs with no gap
-            TextField("", text: $description, axis: .vertical)
-                .placeholder(when: description.isEmpty) {
-                    Text(currentPrompt)
-                        .foregroundColor(.secondary)
-                }
-                .font(.title3)
-                .padding(.horizontal)
-                .padding(.top, -4)
-                .focused($isDescriptionFocused)
-                .submitLabel(.done)
-                .onSubmit {
-                    if !description.isEmpty {
-                        saveEntry()
-                    }
-                }
-                .frame(minHeight: 120)
-            
-            Spacer()
-            
-            // Bottom fields area
-            VStack(spacing: 16) {
-                // Payment fields & client/date selection
-                HStack(spacing: 16) {
-                    // Client selection for all types
-                    Button(action: {
-                        showClientPicker = true
-                    }) {
-                        HStack {
-                            Text(selectedClient?.name ?? "Select Client")
-                                .foregroundColor(selectedClient != nil ? .primary : .secondary)
-                                .lineLimit(1)
-                                .truncationMode(.tail)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 12)
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(8)
-                    }
-                    
-                    Spacer(minLength: 0)
-                    
-                    // Date picker for tasks
-                    if selectedType == .task {
-                        if showDueDate {
-                            Button(action: {
-                                showDatePicker = true
-                            }) {
-                                HStack {
-                                    if Calendar.current.isDateInToday(dueDate) {
-                                        Text("Today")
-                                            .foregroundColor(.green)
-                                    } else if Calendar.current.isDateInTomorrow(dueDate) {
-                                        Text("Tomorrow")
-                                            .foregroundColor(.green)
-                                    } else {
-                                        Text(formattedDate(dueDate))
-                                            .foregroundColor(.green)
-                                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        
+                        // Date picker for tasks
+                        if selectedType == .task {
+                            if showDueDate {
+                                Button(action: {
+                                    showDatePicker = true
+                                }) {
+                                    HStack {
+                                        if Calendar.current.isDateInToday(dueDate) {
+                                            Text("Today")
+                                                .foregroundColor(.appAccent)
+                                        } else if Calendar.current.isDateInTomorrow(dueDate) {
+                                            Text("Tomorrow")
+                                                .foregroundColor(.appAccent)
+                                        } else {
+                                            Text(formattedDate(dueDate))
+                                                .foregroundColor(.appAccent)
+                                                .lineLimit(1)
+                                        }
+                                        
+                                        Image(systemName: "calendar")
+                                            .foregroundColor(.appAccent)
+                                            .font(.system(size: 14))
+                                            .padding(.leading, 2)
                                     }
-                                    
-                                    Image(systemName: "calendar")
-                                        .foregroundColor(.green)
-                                        .font(.system(size: 14))
-                                        .padding(.leading, 2)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 44)
+                                    .background(Color(UIColor.secondarySystemBackground))
+                                    .cornerRadius(8)
+                                    .frame(maxWidth: 150)
                                 }
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 12)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
-                                .frame(maxWidth: 150)
+                                
+                                // Delete date button
+                                Button(action: {
+                                    // Reset date to tomorrow
+                                    dueDate = Date().addingTimeInterval(86400)
+                                    // Toggle due date flag
+                                    showDueDate = false
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.secondary)
+                                        .font(.system(size: 18))
+                                }
+                                .padding(.leading, -8)
+                            } else {
+                                // Add due date button
+                                Button(action: {
+                                    showDueDate = true
+                                    showDatePicker = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "calendar.badge.plus")
+                                            .foregroundColor(.appAccent)
+                                        Text("Add Due Date")
+                                            .foregroundColor(.appAccent)
+                                            .font(.subheadline)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 44)
+                                    .background(Color(UIColor.secondarySystemBackground))
+                                    .cornerRadius(8)
+                                    .frame(maxWidth: 150)
+                                }
                             }
-                            
-                            // Delete date button
-                            Button(action: {
-                                // Reset date to tomorrow
-                                dueDate = Date().addingTimeInterval(86400)
-                                // Toggle due date flag
-                                showDueDate = false
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
+                        }
+                        
+                        // Payment amount field
+                        if selectedType == .payment {
+                            HStack {
+                                Text("$")
                                     .foregroundColor(.secondary)
-                                    .font(.system(size: 18))
+                                    .font(.headline)
+                                
+                                TextField("0.00", text: $amount)
+                                    .keyboardType(.decimalPad)
+                                    .font(.headline)
                             }
-                            .padding(.leading, -8)
-                        } else {
-                            // Add due date button
-                            Button(action: {
-                                showDueDate = true
-                                showDatePicker = true
-                            }) {
-                                HStack {
-                                    Image(systemName: "calendar.badge.plus")
-                                        .foregroundColor(.green)
-                                    Text("Add Due Date")
-                                        .foregroundColor(.green)
-                                        .font(.subheadline)
-                                }
-                                .padding(.vertical, 10)
-                                .padding(.horizontal, 12)
-                                .background(Color(UIColor.secondarySystemBackground))
-                                .cornerRadius(8)
-                                .frame(maxWidth: 150)
-                            }
+                            .padding(.horizontal, 12)
+                            .frame(height: 44)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(8)
                         }
                     }
                     
-                    // Payment amount field
-                    if selectedType == .payment {
-                        HStack {
-                            Text("$")
-                                .foregroundColor(.secondary)
-                                .font(.headline)
-                            
-                            TextField("0.00", text: $amount)
-                                .keyboardType(.decimalPad)
-                                .font(.headline)
-                        }
-                        .padding(.vertical, 10)
-                        .padding(.horizontal, 12)
-                        .background(Color(UIColor.secondarySystemBackground))
-                        .cornerRadius(8)
+                    // Save button
+                    Button(action: saveEntry) {
+                        Text("Save")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 54)
+                            .background(isFormValid ? Color.appAccent : Color.appAccent.opacity(0.5))
+                            .cornerRadius(12)
                     }
+                    .disabled(!isFormValid)
                 }
-                
-                // Save button
-                Button(action: saveEntry) {
-                    Text("Save")
-                        .font(.headline)
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(isFormValid ? Color.green : Color.green.opacity(0.5))
-                        .cornerRadius(12)
-                }
-                .disabled(!isFormValid)
+                .padding(.horizontal)
+                .padding(.bottom, 16)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 16)
+            .frame(height: 420)
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.clear) // Clear the default background to let our ZStack background handle it
         // Modals and pickers
         .sheet(isPresented: $showClientPicker) {
             QuickClientPickerView(selectedClient: $selectedClient)
-                .presentationDetents([.medium])
+                .presentationDetents([.height(420)])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Color(uiColor: .systemBackground))
+                .presentationCornerRadius(24)
+                .interactiveDismissDisabled(false)
         }
         .sheet(isPresented: $showDatePicker) {
             TaskDatePickerView(selectedDate: $dueDate)
                 .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Color(uiColor: .systemBackground))
+                .presentationCornerRadius(24)
+                .interactiveDismissDisabled(false)
         }
         .overlay {
             if showingSavedAnimation {
@@ -659,16 +771,19 @@ struct QuickAddView: View {
                         VStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 60))
-                                .foregroundColor(.green)
+                                .foregroundColor(.appAccent)
                             
                             Text("Saved!")
                                 .font(.title3.weight(.medium))
-                                .foregroundColor(.green)
+                                .foregroundColor(.appAccent)
                                 .padding(.top, 4)
                         }
                     }
+                    .transition(.opacity)
             }
         }
+        .animation(.easeOut(duration: 0.2), value: selectedType)
+        .animation(.easeOut(duration: 0.2), value: showDueDate)
         .onAppear {
             // Select a random prompt when view appears
             currentPrompt = getRandomPrompt(for: selectedType)
@@ -678,8 +793,22 @@ struct QuickAddView: View {
                 isDescriptionFocused = true
             }
             
-            // Set due date visibility for tasks
-            showDueDate = selectedType == .task
+            // Don't automatically set showDueDate to true for tasks
+            // Let it respect the initialized value
+            
+            // Add keyboard observers
+            NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillShowNotification, object: nil, queue: .main) { _ in
+                keyboardIsShown = true
+            }
+            
+            NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { _ in
+                keyboardIsShown = false
+            }
+        }
+        .onDisappear {
+            // Remove keyboard observers
+            NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillShowNotification, object: nil)
+            NotificationCenter.default.removeObserver(self, name: UIResponder.keyboardWillHideNotification, object: nil)
         }
     }
     
@@ -716,7 +845,7 @@ struct QuickAddView: View {
         // Set the date field appropriately based on type
         switch selectedType {
         case .task:
-            // For tasks, if due date is enabled, use that, otherwise use current date
+            // For tasks, only set a due date if showDueDate is true
             if showDueDate {
                 // If the time wasn't specifically set, set to 9:00 AM (or beginning of day)
                 let calendar = Calendar.current
@@ -738,7 +867,8 @@ struct QuickAddView: View {
                     entry.date = dueDate
                 }
             } else {
-                entry.date = now
+                // Don't set a date for unscheduled tasks
+                entry.date = nil
             }
         case .note, .payment:
             // For notes and payments, use current date
@@ -790,7 +920,7 @@ struct QuickAddView: View {
     
     private func colorForType(_ type: LogEntryType) -> Color {
         // Use green for all types to maintain consistency with app theme
-        return .green
+        return .appAccent
     }
     
     // Date formatting helper to check if a date has a non-default time
@@ -868,7 +998,7 @@ struct QuickClientPickerView: View {
                             
                             if selectedClient == nil {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.green)
+                                    .foregroundColor(.appAccent)
                             }
                         }
                     }
@@ -888,7 +1018,7 @@ struct QuickClientPickerView: View {
                                 
                                 if selectedClient == client {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.green)
+                                        .foregroundColor(.appAccent)
                                 }
                             }
                         }
@@ -901,7 +1031,7 @@ struct QuickClientPickerView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.green)
+                    .foregroundColor(.appAccent)
                 }
             }
         }

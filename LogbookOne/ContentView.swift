@@ -105,7 +105,9 @@ struct MainTabView: View {
             }
             
             // Use the QuickActionButton component
-            QuickActionButton(showingSheet: $showingQuickAdd, currentTab: selectedTab)
+            if selectedTab != 1 { // Hide when on Tasks tab
+                QuickActionButton(showingSheet: $showingQuickAdd, currentTab: selectedTab)
+            }
         }
         .sheet(isPresented: $showingQuickAdd) {
             Group {
@@ -124,8 +126,11 @@ struct MainTabView: View {
                     Text("Nothing to add on this screen")
                 }
             }
-            .presentationDragIndicator(.visible)
-            .presentationDetents([.medium])
+            .presentationDragIndicator(.hidden)
+            .presentationDetents([.height(420)])
+            .presentationBackground(Color(uiColor: .systemBackground))
+            .presentationCornerRadius(24)
+            .interactiveDismissDisabled(false)
             .environment(\.managedObjectContext, viewContext)
         }
     }
