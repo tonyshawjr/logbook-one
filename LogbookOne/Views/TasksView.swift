@@ -190,9 +190,10 @@ struct TasksView: View {
                 forceUpdate.toggle()
             }
             .id(forceUpdate) // Force view to update when this changes
-            .navigationTitle("Tasks")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline) // Change to inline to completely hide the title
+            .toolbar(.hidden, for: .navigationBar) // Hide the navigation bar completely
+            .toolbarBackground(Color.themeBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingAddTask) {
                 QuickAddView(initialEntryType: .task, initialDate: selectedDate)
                     .environment(\.managedObjectContext, viewContext)

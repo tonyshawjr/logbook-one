@@ -1,6 +1,32 @@
 import SwiftUI
 import CoreData
 
+// Time of day enum for greeting messages
+enum TimeOfDay {
+    case morning
+    case midday
+    case evening
+    case night
+    
+    var greeting: String {
+        switch self {
+        case .morning: return "Good morning"
+        case .midday: return "Hey"
+        case .evening: return "Good evening"
+        case .night: return "Still working"
+        }
+    }
+    
+    var message: String {
+        switch self {
+        case .morning: return "Let's win the day."
+        case .midday: return "You're halfway there."
+        case .evening: return "Need to wrap up anything?"
+        case .night: return "Late night grind?"
+        }
+    }
+}
+
 // Time periods for revenue filtering
 enum RevenuePeriod {
     case month, year
@@ -49,6 +75,9 @@ struct DashboardView: View {
     @State private var showingAddEntry = false
     @State private var showingAddClient = false
     @State private var activitySortAscending = false
+    
+    // User name from settings
+    @AppStorage("userName") private var userName: String = ""
     
     // Time formatter for activity times
     private let timeFormatter: DateFormatter = {
@@ -125,6 +154,9 @@ struct DashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 20) {
+                // User greeting
+                personalGreeting
+                
                 // Revenue summary
                 revenueCard
                 
@@ -147,14 +179,61 @@ struct DashboardView: View {
             .padding(.vertical)
         }
         .background(Color.themeBackground)
-        .navigationTitle("Dashboard")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(Color.themeBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingAddEntry) {
             LogEntryFormView()
         }
         .sheet(isPresented: $showingAddClient) {
             ClientFormView()
         }
+    }
+    
+    // Personal greeting based on time of day
+    private var personalGreeting: some View {
+        let timeOfDay = getCurrentTimeOfDay()
+        let firstName = getFirstName(from: userName)
+        
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("\(timeOfDay.greeting), \(firstName).")
+                .font(.appTitle)
+                .fontWeight(.bold)
+                .foregroundColor(.themePrimary)
+            
+            Text(timeOfDay.message)
+                .font(.appSubheadline)
+                .foregroundColor(.themeSecondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+    }
+    
+    // Function to get time of day for appropriate greeting
+    private func getCurrentTimeOfDay() -> TimeOfDay {
+        let hour = Calendar.current.component(.hour, from: Date())
+        
+        switch hour {
+        case 5..<12:
+            return .morning
+        case 12..<17:
+            return .midday
+        case 17..<21:
+            return .evening
+        default:
+            return .night
+        }
+    }
+    
+    // Extract first name from full name
+    private func getFirstName(from fullName: String) -> String {
+        guard !fullName.isEmpty else { return "there" }
+        
+        let components = fullName.components(separatedBy: " ")
+        return components.first ?? fullName
     }
     
     private var revenueCard: some View {

@@ -32,8 +32,10 @@ struct ClientListView: View {
         }
         .background(Color.themeBackground)
         .searchable(text: $searchText, prompt: "Search clients")
-        .navigationTitle("Clients")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(Color.themeBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .sheet(isPresented: $showingAddClient) {
             ClientFormView()
         }

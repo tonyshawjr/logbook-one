@@ -89,7 +89,10 @@ struct NotesView: View {
                     .background(Color.themeBackground)
                 }
             }
-            .navigationTitle("Notes")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbarBackground(Color.themeBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .searchable(text: $searchText, prompt: "Search notes")
             .background(Color.themeBackground)
         }
