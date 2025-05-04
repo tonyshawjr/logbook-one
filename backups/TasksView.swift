@@ -571,14 +571,8 @@ struct TaskCardView: View {
     }
     
     private func toggleCompletion() {
-        let wasComplete = isComplete
         isComplete.toggle()
         task.isComplete = isComplete
-        
-        // If task is being completed (not uncompleted), create a completion entry
-        if !wasComplete && isComplete {
-            createCompletionEntry()
-        }
         
         do {
             try viewContext.save()
@@ -588,24 +582,6 @@ struct TaskCardView: View {
             generator.impactOccurred()
         } catch {
             print("Error saving task completion: \(error)")
-        }
-    }
-    
-    private func createCompletionEntry() {
-        // Create a new log entry for the completed task to show in Today's Activity
-        let completionEntry = LogEntry(context: viewContext)
-        completionEntry.id = UUID()
-        completionEntry.type = LogEntryType.task.rawValue
-        completionEntry.desc = "Completed: \(task.desc ?? "Task")"
-        completionEntry.date = Date() // Current time
-        completionEntry.setValue(Date(), forKey: "creationDate") // Set creation date to now
-        completionEntry.isComplete = true
-        completionEntry.client = task.client
-        completionEntry.tag = task.tag
-        
-        // If the original task had an amount, copy it
-        if let amount = task.amount {
-            completionEntry.amount = amount
         }
     }
 }
@@ -710,14 +686,8 @@ struct UnscheduledTaskCardView: View {
     }
     
     private func toggleCompletion() {
-        let wasComplete = isComplete
         isComplete.toggle()
         task.isComplete = isComplete
-        
-        // If task is being completed (not uncompleted), create a completion entry
-        if !wasComplete && isComplete {
-            createCompletionEntry()
-        }
         
         do {
             try viewContext.save()
@@ -727,24 +697,6 @@ struct UnscheduledTaskCardView: View {
             generator.impactOccurred()
         } catch {
             print("Error saving task completion: \(error)")
-        }
-    }
-    
-    private func createCompletionEntry() {
-        // Create a new log entry for the completed task to show in Today's Activity
-        let completionEntry = LogEntry(context: viewContext)
-        completionEntry.id = UUID()
-        completionEntry.type = LogEntryType.task.rawValue
-        completionEntry.desc = "Completed: \(task.desc ?? "Task")"
-        completionEntry.date = Date() // Current time
-        completionEntry.setValue(Date(), forKey: "creationDate") // Set creation date to now
-        completionEntry.isComplete = true
-        completionEntry.client = task.client
-        completionEntry.tag = task.tag
-        
-        // If the original task had an amount, copy it
-        if let amount = task.amount {
-            completionEntry.amount = amount
         }
     }
 }
