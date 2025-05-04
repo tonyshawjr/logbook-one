@@ -377,6 +377,74 @@ struct EntryDetailView: View {
             print("Error deleting entry: \(error)")
         }
     }
+    
+    // MARK: - Content Sections
+    
+    // Note details section
+    private func noteDetails() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // Note content with formatted hashtags
+            if let desc = entry.desc {
+                FormattedNoteText(text: desc)
+                    .padding()
+                    .background(Color.themeCard)
+                    .cornerRadius(16)
+            }
+            
+            // Creation date
+            if let date = entry.creationDate ?? entry.date {
+                HStack {
+                    Text("Created on")
+                        .font(.callout)
+                        .foregroundColor(.themeSecondary)
+                    Text(dateFormatter.string(from: date))
+                        .font(.callout)
+                        .foregroundColor(.themePrimary)
+                }
+                .padding(.horizontal)
+            }
+            
+            // Show tags as pills if they exist - these are auto-extracted from content
+            if let noteText = entry.desc {
+                let extractedTags = HashtagExtractor.extractHashtags(from: noteText)
+                if !extractedTags.isEmpty {
+                    tagsSection(tags: extractedTags)
+                } else if let tag = entry.tag, !tag.isEmpty {
+                    // Fallback to the stored tag if no hashtags found
+                    tagsSection(tags: [tag])
+                }
+            }
+        }
+        .padding(.bottom)
+    }
+    
+    // Tags section - shows multiple tags if present
+    private func tagsSection(tags: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tags")
+                .font(.subheadline)
+                .foregroundColor(.themeSecondary)
+                .padding(.horizontal)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(tags, id: \.self) { tag in
+                        Text(tag)
+                            .font(.system(.body, design: .rounded))
+                            .foregroundColor(.themeAccent)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(
+                                Capsule()
+                                    .fill(Color.themeAccent.opacity(0.1))
+                            )
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+        .padding(.top, 8)
+    }
 }
 
 struct EditEntryView: View {

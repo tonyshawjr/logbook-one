@@ -12,6 +12,25 @@ enum TimePeriod: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
+// MARK: - Payments Header View
+struct PaymentsHeaderView: View {
+    var body: some View {
+        HStack {
+            // Title - "Payments" with styling matching Notes header
+            Text("Payments")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+                .foregroundColor(.themePrimary)
+            
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
+        .background(Color.themeBackground)
+    }
+}
+
 struct PaymentsView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var selectedClient: Client? = nil
@@ -54,9 +73,44 @@ struct PaymentsView: View {
         }
     }
     
+    // Group payments by date for timeline view - similar to NotesView
+    private var groupedPayments: [(String, [LogEntry])] {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+        
+        let grouped = Dictionary(grouping: payments) { payment -> String in
+            guard let date = payment.date else { return "Undated" }
+            
+            let paymentDate = calendar.startOfDay(for: date)
+            
+            if calendar.isDate(paymentDate, inSameDayAs: today) {
+                return "Today"
+            } else if calendar.isDate(paymentDate, inSameDayAs: yesterday) {
+                return "Yesterday"
+            } else {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "MMMM d"
+                return formatter.string(from: date)
+            }
+        }
+        
+        // Sort sections by date, with Today and Yesterday first
+        return grouped.sorted { section1, section2 in
+            if section1.key == "Today" { return true }
+            if section2.key == "Today" { return false }
+            if section1.key == "Yesterday" { return true }
+            if section2.key == "Yesterday" { return false }
+            return section1.key > section2.key
+        }
+    }
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                // Add Payments header at the top
+                PaymentsHeaderView()
+                
                 // Revenue card
                 revenueCard
                 
@@ -134,19 +188,12 @@ struct PaymentsView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
                 
-                // Payments list
+                // Payments list with timeline
                 if payments.isEmpty {
                     emptyStateView
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(payments.filter { $0.managedObjectContext != nil }) { payment in
-                                PaymentRow(payment: payment)
-                            }
-                        }
-                        .padding(.top, 6)
-                    }
-                    .background(Color.themeBackground)
+                    // Updated to use timeline style like Notes view
+                    PaymentsTimelineView(groupedPayments: groupedPayments)
                 }
             }
             .background(Color.themeBackground)
@@ -532,6 +579,152 @@ struct PeriodPickerView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Payments Timeline View
+struct PaymentsTimelineView: View {
+    let groupedPayments: [(String, [LogEntry])]
+    
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                // Break up the complex expression by using indices directly
+                ForEach(0..<groupedPayments.count, id: \.self) { index in
+                    let section = groupedPayments[index].0
+                    let paymentsInSection = groupedPayments[index].1
+                    let isLastSection = index == groupedPayments.count - 1
+                    
+                    PaymentsTimelineSectionView(
+                        section: section,
+                        payments: paymentsInSection,
+                        isLastSection: isLastSection
+                    )
+                }
+                
+                // Bottom padding to ensure last items are visible above FAB
+                Color.clear.frame(height: 80)
+            }
+        }
+        .background(Color.themeBackground)
+    }
+}
+
+// MARK: - Payments Timeline Section View
+struct PaymentsTimelineSectionView: View {
+    let section: String
+    let payments: [LogEntry]
+    let isLastSection: Bool
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Date header at the top
+            Text(section)
+                .font(.headline)
+                .foregroundColor(.themeSecondary)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
+                .padding(.leading, 16)
+            
+            // Payments with vertical line beside them
+            ForEach(payments) { payment in
+                HStack(alignment: .top, spacing: 0) {
+                    // Vertical line
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 2)
+                        .padding(.leading, 24)
+                    
+                    // Payment card - use the existing PaymentRow styling but adjusted for timeline
+                    PaymentTimelineCard(payment: payment)
+                        .padding(.leading, 10)
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 16)
+                }
+            }
+            
+            // Extra space at end of section (except for last one)
+            if !isLastSection {
+                Color.clear.frame(height: 8)
+            }
+        }
+    }
+}
+
+// MARK: - Payment Timeline Card
+struct PaymentTimelineCard: View {
+    @ObservedObject var payment: LogEntry
+    
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
+    private func formatCurrency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? "$0.00"
+    }
+    
+    var body: some View {
+        NavigationLink(destination: EntryDetailView(entry: payment)) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Client name and description
+                VStack(alignment: .leading, spacing: 6) {
+                    if let client = payment.client {
+                        Text(client.name ?? "Client")
+                            .font(.system(.headline))
+                            .fontWeight(.semibold)
+                            .foregroundColor(.themePrimary)
+                    }
+                    
+                    Text(payment.desc ?? "")
+                        .font(.subheadline)
+                        .foregroundColor(.themeSecondary)
+                        .lineLimit(2)
+                }
+                
+                // Amount with trailing time
+                HStack {
+                    if let amount = payment.amount as NSDecimalNumber? {
+                        Text(formatCurrency(amount.doubleValue))
+                            .font(.system(.title3, design: .rounded).weight(.bold))
+                            .foregroundColor(.themePayment)
+                    }
+                    
+                    Spacer()
+                    
+                    // Time only (date is in the section header)
+                    if let date = payment.date {
+                        Text(dateFormatter.string(from: date))
+                            .font(.appCaption)
+                            .foregroundColor(.themeSecondary)
+                    }
+                }
+                
+                // Show tag if it exists
+                if let tag = payment.tag, !tag.isEmpty {
+                    Text(tag)
+                        .font(.footnote)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                }
+            }
+            .padding()
+            .background(Color.themeCard)
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.gray.opacity(0.1), lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 }
 
