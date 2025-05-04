@@ -34,14 +34,6 @@ struct ClientListView: View {
         .searchable(text: $searchText, prompt: "Search clients")
         .navigationTitle("Clients")
         .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: { showingAddClient = true }) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 16, weight: .bold))
-                }
-            }
-        }
         .sheet(isPresented: $showingAddClient) {
             ClientFormView()
         }

@@ -137,14 +137,6 @@ struct TasksView: View {
             }
             .background(Color.appBackground)
             .navigationTitle("Tasks")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddTask = true }) {
-                        Image(systemName: "plus")
-                            .font(.headline)
-                    }
-                }
-            }
             .sheet(isPresented: $showingAddTask) {
                 // Pre-select the task type
                 LogEntryFormView(selectedType: .task, client: selectedClient)
