@@ -1,6 +1,9 @@
 import SwiftUI
 import CoreData
 
+// Import HashtagExtractor utility
+import Foundation
+
 // Task Date Picker View
 struct TaskDatePickerView: View {
     @Environment(\.dismiss) private var dismiss
@@ -876,7 +879,22 @@ struct QuickAddView: View {
         }
         
         entry.client = selectedClient
-        entry.tag = selectedTag.isEmpty ? nil : selectedTag
+        
+        // For notes, automatically extract hashtags from the description
+        if selectedType == .note {
+            // Extract hashtags from the note text
+            let extractedTags = HashtagExtractor.extractHashtags(from: description)
+            if !extractedTags.isEmpty {
+                // Join tags with commas for storage
+                entry.tag = HashtagExtractor.hashtags(toStorageFormat: extractedTags)
+            } else if !selectedTag.isEmpty {
+                // Fallback to manually selected tag if no hashtags in the text
+                entry.tag = selectedTag
+            }
+        } else {
+            // For other entry types, use the selected tag
+            entry.tag = selectedTag.isEmpty ? nil : selectedTag
+        }
         
         // Handle task-specific properties
         if selectedType == .task {
