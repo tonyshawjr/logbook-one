@@ -294,14 +294,8 @@ struct EntryDetailView: View {
     
     private func toggleCompletion() {
         withAnimation {
-            let wasComplete = isComplete
             isComplete.toggle()
             entry.isComplete = isComplete
-            
-            // If task is being completed (not uncompleted), create a completion entry
-            if !wasComplete && isComplete {
-                createCompletionEntry()
-            }
             
             do {
                 try viewContext.save()
@@ -312,24 +306,6 @@ struct EntryDetailView: View {
             } catch {
                 print("Error saving task completion status: \(error)")
             }
-        }
-    }
-    
-    private func createCompletionEntry() {
-        // Create a new log entry for the completed task to show in Today's Activity
-        let completionEntry = LogEntry(context: viewContext)
-        completionEntry.id = UUID()
-        completionEntry.type = LogEntryType.task.rawValue
-        completionEntry.desc = "Completed: \(entry.desc ?? "Task")"
-        completionEntry.date = Date() // Current time
-        completionEntry.setValue(Date(), forKey: "creationDate") // Set creation date to now
-        completionEntry.isComplete = true
-        completionEntry.client = entry.client
-        completionEntry.tag = entry.tag
-        
-        // If the original task had an amount, copy it
-        if let amount = entry.amount {
-            completionEntry.amount = amount
         }
     }
     

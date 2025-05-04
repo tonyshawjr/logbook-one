@@ -48,7 +48,6 @@ struct DashboardView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var showingAddEntry = false
     @State private var showingAddClient = false
-    @State private var activitySortAscending = false
     
     // Time formatter for activity times
     private let timeFormatter: DateFormatter = {
@@ -58,13 +57,9 @@ struct DashboardView: View {
     }()
     
     @FetchRequest(
-        sortDescriptors: [
-            NSSortDescriptor(keyPath: \LogEntry.creationDate, ascending: false),
-            NSSortDescriptor(keyPath: \LogEntry.date, ascending: false)
-        ],
-        predicate: NSPredicate(format: "date >= %@ OR creationDate >= %@", 
-                              Calendar.current.startOfDay(for: Date()) as NSDate,
-                              Calendar.current.startOfDay(for: Date()) as NSDate),
+        sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.date, ascending: false)],
+        predicate: NSPredicate(format: "date >= %@", 
+                               Calendar.current.startOfDay(for: Date()) as NSDate),
         animation: .default)
     private var todayEntries: FetchedResults<LogEntry>
     
@@ -400,26 +395,6 @@ struct DashboardView: View {
                 .font(.appTitle3)
             
             Spacer()
-            
-            Button(action: {
-                withAnimation {
-                    activitySortAscending.toggle()
-                }
-            }) {
-                HStack(spacing: 4) {
-                    Text(activitySortAscending ? "Oldest first" : "Newest first")
-                        .font(.caption)
-                        .foregroundColor(.themeSecondary)
-                    
-                    Image(systemName: activitySortAscending ? "arrow.up" : "arrow.down")
-                        .font(.caption)
-                        .foregroundColor(.themeAccent)
-                }
-                .padding(.vertical, 4)
-                .padding(.horizontal, 8)
-                .background(Color.themeCard)
-                .cornerRadius(8)
-            }
         }
         .padding(.horizontal)
     }
@@ -450,28 +425,13 @@ struct DashboardView: View {
     
     private var entriesList: some View {
         LazyVStack(spacing: 12) {
-            let sortedEntries = activitySortAscending ? 
-                            Array(todayEntries.sorted(by: { 
-                                (getEntryTime($0) ?? Date.distantPast) < (getEntryTime($1) ?? Date.distantPast) 
-                            })) :
-                            Array(todayEntries)
-            
-            ForEach(sortedEntries, id: \.id) { entry in
+            ForEach(todayEntries) { entry in
                 NavigationLink(destination: EntryDetailView(entry: entry)) {
                     LogEntryCard(entry: entry)
                         .padding(.horizontal)
                 }
                 .buttonStyle(PlainButtonStyle())
             }
-        }
-    }
-    
-    // Helper to get an entry's time for sorting (creationDate or date)
-    private func getEntryTime(_ entry: LogEntry) -> Date? {
-        if let creationDate = entry.value(forKey: "creationDate") as? Date {
-            return creationDate
-        } else {
-            return entry.date
         }
     }
     
