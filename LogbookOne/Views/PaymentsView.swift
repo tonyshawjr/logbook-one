@@ -151,14 +151,6 @@ struct PaymentsView: View {
             }
             .background(Color.appBackground)
             .navigationTitle("Payments")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingAddPayment = true }) {
-                        Image(systemName: "plus")
-                            .font(.headline)
-                    }
-                }
-            }
             .sheet(isPresented: $showingAddPayment) {
                 // Pre-select the payment type
                 LogEntryFormView(selectedType: .payment, client: selectedClient)

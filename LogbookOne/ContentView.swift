@@ -50,16 +50,21 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @State private var showingQuickAdd = false
+    @State private var selectedTab = 0
+    
+    // Environment to pass to the various views
+    @Environment(\.managedObjectContext) private var viewContext
     
     var body: some View {
         ZStack {
-            TabView {
+            TabView(selection: $selectedTab) {
                 NavigationStack {
                     DashboardView()
                 }
                 .tabItem {
                     Label("Today", systemImage: "house")
                 }
+                .tag(0)
                 
                 NavigationStack {
                     TasksView()
@@ -67,13 +72,15 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Tasks", systemImage: "checkmark.circle")
                 }
+                .tag(1)
                 
                 NavigationStack {
-                    ClientListView()
+                    NotesView()
                 }
                 .tabItem {
-                    Label("Clients", systemImage: "person.3")
+                    Label("Notes", systemImage: "doc.text")
                 }
+                .tag(2)
                 
                 NavigationStack {
                     PaymentsView()
@@ -81,41 +88,45 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Payments", systemImage: "dollarsign.circle")
                 }
+                .tag(3)
                 
                 NavigationStack {
-                    ExportView()
+                    ClientListView()
                 }
                 .tabItem {
-                    Label("Export", systemImage: "square.and.arrow.up")
+                    Label("Clients", systemImage: "person.3")
                 }
+                .tag(4)
             }
             .tint(Color.appAccent)
-            
-            // Floating Action Button
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        showingQuickAdd = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2.bold())
-                            .foregroundColor(.white)
-                            .frame(width: 60, height: 60)
-                            .background(Color.appAccent)
-                            .clipShape(Circle())
-                            .shadow(color: Color.appAccent.opacity(0.3), radius: 5, x: 0, y: 3)
-                    }
-                    .padding(.trailing, 20)
-                    .padding(.bottom, 80) // Position above tab bar
-                }
+            .environment(\.managedObjectContext, viewContext)
+            .onChange(of: selectedTab) { oldValue, newValue in
+                print("Tab changed from \(oldValue) to \(newValue)")
             }
+            
+            // Use the QuickActionButton component
+            QuickActionButton(showingSheet: $showingQuickAdd, currentTab: selectedTab)
         }
         .sheet(isPresented: $showingQuickAdd) {
-            QuickAddView()
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
+            Group {
+                switch selectedTab {
+                case 0: // Dashboard - show general quick add
+                    QuickAddView()
+                case 1: // Tasks
+                    QuickAddView(initialEntryType: .task)
+                case 2: // Notes
+                    QuickAddView(initialEntryType: .note)
+                case 3: // Payments
+                    QuickAddView(initialEntryType: .payment)
+                case 4: // Clients
+                    ClientFormView()
+                default:
+                    Text("Nothing to add on this screen")
+                }
+            }
+            .presentationDragIndicator(.visible)
+            .presentationDetents([.medium])
+            .environment(\.managedObjectContext, viewContext)
         }
     }
 }

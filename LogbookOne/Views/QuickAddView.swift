@@ -439,6 +439,13 @@ struct QuickAddView: View {
         _selectedType = State(initialValue: LogEntryType(rawValue: Int16(savedType)) ?? .task)
     }
     
+    // Initialize with a specific entry type (for context-aware quick add)
+    init(initialEntryType: LogEntryType) {
+        _selectedType = State(initialValue: initialEntryType)
+        // Still save this as the last used type
+        UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Header with close button and tabs at the top
