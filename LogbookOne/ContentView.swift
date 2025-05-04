@@ -29,9 +29,11 @@ struct MainTabView: View {
     
     // Environment to pass to the various views
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
         ZStack {
+            // Tab view
             TabView(selection: $selectedTab) {
                 NavigationStack {
                     DashboardView()
@@ -66,22 +68,53 @@ struct MainTabView: View {
                 .tag(3)
                 
                 NavigationStack {
-                    ClientListView()
+                    MoreView()
                 }
                 .tabItem {
-                    Label("Clients", systemImage: "person.3")
+                    Label("More", systemImage: "ellipsis")
                 }
                 .tag(4)
             }
             .tint(Color.themeAccent)
             .environment(\.managedObjectContext, viewContext)
-            .onChange(of: selectedTab) { oldValue, newValue in
-                print("Tab changed from \(oldValue) to \(newValue)")
+            .onAppear {
+                // Reset any unwanted tab bar appearance settings
+                let appearance = UITabBarAppearance()
+                appearance.configureWithDefaultBackground()
+                UITabBar.appearance().standardAppearance = appearance
+                UITabBar.appearance().scrollEdgeAppearance = appearance
+                UITabBar.appearance().backgroundColor = nil
+                UITabBar.appearance().isTranslucent = true
             }
             
-            // Use the QuickActionButton component
-            if selectedTab != 1 { // Hide when on Tasks tab
-                QuickActionButton(showingSheet: $showingQuickAdd, currentTab: selectedTab)
+            // Quick add button as a floating layer
+            if selectedTab != 1 && selectedTab != 4 { // Hide when on Tasks or More tab
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: {
+                            // Use haptic feedback when pressing button
+                            let impactMed = UIImpactFeedbackGenerator(style: .medium)
+                            impactMed.impactOccurred()
+                            
+                            showingQuickAdd = true
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 24, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
+                                .background(
+                                    Circle()
+                                        .fill(Color.themeAccent)
+                                        .shadow(color: Color.themeAccent.opacity(0.3), radius: 5, x: 0, y: 3)
+                                )
+                        }
+                        .buttonStyle(ScaleButtonStyle())
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 80) // Position above tab bar
+                    }
+                }
             }
         }
         .sheet(isPresented: $showingQuickAdd) {
@@ -95,7 +128,7 @@ struct MainTabView: View {
                     QuickAddView(initialEntryType: .note)
                 case 3: // Payments
                     QuickAddView(initialEntryType: .payment)
-                case 4: // Clients
+                case 4: // More tab - show client form
                     ClientFormView()
                 default:
                     Text("Nothing to add on this screen")

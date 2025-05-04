@@ -150,7 +150,10 @@ struct PaymentsView: View {
                 }
             }
             .background(Color.themeBackground)
-            .navigationTitle("Payments")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .toolbarBackground(Color.themeBackground, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingAddPayment) {
                 // Pre-select the payment type
                 LogEntryFormView(selectedType: .payment, client: selectedClient)

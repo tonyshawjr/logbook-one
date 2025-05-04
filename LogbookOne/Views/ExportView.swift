@@ -4,237 +4,307 @@ import UniformTypeIdentifiers
 
 struct ExportView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @Environment(\.dismiss) private var dismiss
-    
-    @State private var startDate: Date = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
-    @State private var endDate: Date = Date()
-    @State private var selectedClient: Client?
-    @State private var selectedType: LogEntryType?
-    @State private var exportURL: URL?
+    @State private var exportFormat = ExportFormat.csv
+    @State private var isExporting = false
+    @State private var exportedData: Data?
     @State private var showingShareSheet = false
-    @State private var isGenerating = false
-    @State private var entriesFound = 0
+    @State private var showingSuccessAlert = false
+    @State private var showingErrorAlert = false
+    @State private var errorMessage = ""
     
-    @FetchRequest(
-        sortDescriptors: [NSSortDescriptor(keyPath: \Client.name, ascending: true)],
-        animation: .default)
-    private var clients: FetchedResults<Client>
+    enum ExportFormat: String, CaseIterable, Identifiable {
+        case csv = "CSV"
+        case json = "JSON"
+        
+        var id: String { self.rawValue }
+        
+        var fileExtension: String {
+            switch self {
+            case .csv: return "csv"
+            case .json: return "json"
+            }
+        }
+        
+        var mimeType: String {
+            switch self {
+            case .csv: return "text/csv"
+            case .json: return "application/json"
+            }
+        }
+        
+        var utType: UTType {
+            switch self {
+            case .csv: return UTType.commaSeparatedText
+            case .json: return UTType.json
+            }
+        }
+    }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                VStack(spacing: 8) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.system(size: 60))
-                        .foregroundColor(.accentColor)
-                        .padding(.bottom, 10)
-                    
-                    Text("Export Log Entries")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    
-                    Text("Generate a CSV file of your log entries filtered by date, client, and type.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-                .padding(.top, 20)
-                
-                // Filters
-                VStack(spacing: 16) {
-                    filterSection
-                    
-                    generateButton
-                    
-                    if let url = exportURL {
-                        shareSection(url: url)
+        List {
+            Section(header: Text("Export Format")) {
+                Picker("Format", selection: $exportFormat) {
+                    ForEach(ExportFormat.allCases) { format in
+                        Text(format.rawValue).tag(format)
                     }
                 }
-                .padding(.horizontal)
+                .pickerStyle(.segmented)
+                .padding(.vertical, 8)
+            }
+            
+            Section(header: Text("Data to Export")) {
+                Toggle("Tasks", isOn: .constant(true))
+                    .disabled(true) // Always export tasks
+                
+                Toggle("Notes", isOn: .constant(true))
+                    .disabled(true) // Always export notes
+                
+                Toggle("Payments", isOn: .constant(true))
+                    .disabled(true) // Always export payments
+                
+                Toggle("Clients", isOn: .constant(true))
+                    .disabled(true) // Always export clients
+            }
+            
+            Section {
+                Button(action: exportData) {
+                    HStack {
+                        Spacer()
+                        if isExporting {
+                            ProgressView()
+                                .padding(.trailing, 10)
+                        }
+                        Text("Export Data")
+                            .font(.appHeadline)
+                        Spacer()
+                    }
+                    .frame(height: 44)
+                }
+                .disabled(isExporting)
+                .buttonStyle(.borderedProminent)
+                .tint(.themeAccent)
+                .listRowInsets(EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10))
             }
         }
         .navigationTitle("Export Data")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingShareSheet) {
-            if let url = exportURL {
-                ShareSheet(items: [url])
+            if let data = exportedData {
+                ShareSheet(items: [data], 
+                          fileName: "logbook_export.\(exportFormat.fileExtension)",
+                          contentType: exportFormat.utType)
             }
+        }
+        .alert("Export Successful", isPresented: $showingSuccessAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("Your data has been exported successfully.")
+        }
+        .alert("Export Failed", isPresented: $showingErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(errorMessage)
         }
     }
     
-    private var filterSection: some View {
-        VStack(spacing: 20) {
-            // Date Range
-            GroupBox(label: Label("Date Range", systemImage: "calendar")) {
-                VStack(spacing: 16) {
-                    DatePicker("Start Date", selection: $startDate, displayedComponents: .date)
-                    DatePicker("End Date", selection: $endDate, displayedComponents: .date)
-                }
-                .padding(.vertical, 10)
-            }
-            
-            // Client Filter
-            GroupBox(label: Label("Client", systemImage: "person")) {
-                Picker("Select Client", selection: $selectedClient) {
-                    Text("All Clients").tag(nil as Client?)
-                    ForEach(clients) { client in
-                        Text(client.name ?? "Unnamed Client").tag(client as Client?)
-                    }
-                }
-                .pickerStyle(.menu)
-                .padding(.vertical, 10)
-            }
-            
-            // Type Filter
-            GroupBox(label: Label("Entry Type", systemImage: "tag")) {
-                Picker("Select Type", selection: $selectedType) {
-                    Text("All Types").tag(nil as LogEntryType?)
-                    ForEach(LogEntryType.allCases) { type in
-                        Text(type.displayName).tag(type as LogEntryType?)
-                    }
-                }
-                .pickerStyle(.menu)
-                .padding(.vertical, 10)
-            }
-        }
-    }
-    
-    private var generateButton: some View {
-        Button(action: {
-            isGenerating = true
-            generateCSV()
-        }) {
-            HStack {
-                if isGenerating {
-                    ProgressView()
-                        .padding(.trailing, 5)
-                }
+    private func exportData() {
+        isExporting = true
+        
+        // Perform export on background thread to avoid UI freezes
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let data = try generateExportData()
                 
-                Text(isGenerating ? "Generating..." : "Generate CSV")
-                    .font(.headline)
+                // Return to main thread to update UI
+                DispatchQueue.main.async {
+                    self.exportedData = data
+                    self.isExporting = false
+                    self.showingShareSheet = true
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isExporting = false
+                    self.errorMessage = error.localizedDescription
+                    self.showingErrorAlert = true
+                }
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.accentColor)
-            .foregroundColor(.white)
-            .cornerRadius(10)
-        }
-        .disabled(isGenerating)
-        .frame(height: 55)
-    }
-    
-    private func shareSection(url: URL) -> some View {
-        VStack(spacing: 10) {
-            Divider()
-                .padding(.vertical, 10)
-            
-            Text("Found \(entriesFound) log \(entriesFound == 1 ? "entry" : "entries")")
-                .font(.headline)
-            
-            Text("Your export file is ready")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-            
-            Button(action: { showingShareSheet = true }) {
-                Label("Share CSV File", systemImage: "square.and.arrow.up")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color(.systemGray5))
-                    .foregroundColor(.primary)
-                    .cornerRadius(10)
-            }
-            .frame(height: 55)
         }
     }
     
-    private func generateCSV() {
-        let fetchRequest: NSFetchRequest<LogEntry> = LogEntry.fetchRequest()
+    private func generateExportData() throws -> Data {
+        // Get all entries
+        let entriesFetch = NSFetchRequest<LogEntry>(entityName: "LogEntry")
+        let entries = try viewContext.fetch(entriesFetch)
         
-        var predicates: [NSPredicate] = []
-        predicates.append(NSPredicate(format: "date >= %@", startDate as NSDate))
-        predicates.append(NSPredicate(format: "date <= %@", endDate as NSDate))
+        // Get all clients
+        let clientsFetch = NSFetchRequest<Client>(entityName: "Client")
+        let clients = try viewContext.fetch(clientsFetch)
         
-        if let client = selectedClient {
-            predicates.append(NSPredicate(format: "client == %@", client))
-        }
+        // Create export structure
+        let exportData = ExportData(
+            exportDate: Date(),
+            entries: entries.map { ExportEntry(from: $0) },
+            clients: clients.map { ExportClient(from: $0) }
+        )
         
-        if let type = selectedType {
-            predicates.append(NSPredicate(format: "type == %d", type.rawValue))
-        }
-        
-        fetchRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
-        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \LogEntry.date, ascending: true)]
-        
-        do {
-            let entries = try viewContext.fetch(fetchRequest)
-            entriesFound = entries.count
-            let csvString = generateCSVString(from: entries)
+        // Format based on selected format
+        switch exportFormat {
+        case .json:
+            let encoder = JSONEncoder()
+            encoder.dateEncodingStrategy = .iso8601
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            return try encoder.encode(exportData)
             
-            let tempDir = FileManager.default.temporaryDirectory
-            let fileName = "logbook_export_\(Date().timeIntervalSince1970).csv"
-            let fileURL = tempDir.appendingPathComponent(fileName)
-            
-            try csvString.write(to: fileURL, atomically: true, encoding: .utf8)
-            exportURL = fileURL
-            isGenerating = false
-        } catch {
-            print("Error generating CSV: \(error)")
-            isGenerating = false
+        case .csv:
+            return try generateCSV(exportData)
         }
     }
     
-    private func generateCSVString(from entries: [LogEntry]) -> String {
-        var csvString = "Date,Client,Type,Description,Amount,Tag\n"
+    private func generateCSV(_ data: ExportData) throws -> Data {
+        var csvString = ""
         
-        for entry in entries {
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateStyle = .short
-            dateFormatter.timeStyle = .short
-            
-            let dateString: String
-            if let date = entry.date {
-                dateString = dateFormatter.string(from: date)
-            } else {
-                dateString = "No Date"
-            }
-            
-            let client = entry.client?.name ?? "No Client"
-            let type = LogEntryType(rawValue: entry.type)?.displayName ?? "Unknown"
-            let description = entry.desc?.replacingOccurrences(of: ",", with: ";") ?? ""
-            
-            let amount: String
-            if entry.type == LogEntryType.payment.rawValue, 
-               let decimalAmount = entry.amount as NSDecimalNumber? {
-                amount = String(format: "%.2f", decimalAmount.doubleValue)
-            } else {
-                amount = ""
-            }
-            
-            let tag = entry.tag?.replacingOccurrences(of: ",", with: ";") ?? ""
-            
-            csvString += "\(dateString),\(client),\(type),\(description),\(amount),\(tag)\n"
+        // Add metadata
+        csvString += "Logbook One Export\n"
+        csvString += "Export Date,\(ISO8601DateFormatter().string(from: data.exportDate))\n\n"
+        
+        // Add clients section
+        csvString += "CLIENTS\n"
+        csvString += "ID,Name,Tag,Hourly Rate\n"
+        
+        for client in data.clients {
+            csvString += "\(client.id),\(escapeCSV(client.name)),\(escapeCSV(client.tag)),\(client.hourlyRate)\n"
         }
         
-        return csvString
+        csvString += "\n"
+        
+        // Add entries section
+        csvString += "ENTRIES\n"
+        csvString += "ID,Type,Date,Description,Client ID,Is Complete,Amount,Tag\n"
+        
+        for entry in data.entries {
+            csvString += "\(entry.id),\(entry.type),\(entry.date),"
+            csvString += "\(escapeCSV(entry.description)),\(entry.clientID ?? ""),"
+            csvString += "\(entry.isComplete),\(entry.amount ?? 0),"
+            csvString += "\(escapeCSV(entry.tag))\n"
+        }
+        
+        return csvString.data(using: .utf8) ?? Data()
+    }
+    
+    private func escapeCSV(_ string: String?) -> String {
+        guard let string = string else { return "" }
+        let containsComma = string.contains(",")
+        let containsQuote = string.contains("\"")
+        let containsNewline = string.contains("\n")
+        
+        if containsComma || containsQuote || containsNewline {
+            // Replace quotes with double quotes and wrap in quotes
+            return "\"" + string.replacingOccurrences(of: "\"", with: "\"\"") + "\""
+        }
+        
+        return string
     }
 }
 
+// Data models for export
+
+struct ExportData: Codable {
+    let exportDate: Date
+    let entries: [ExportEntry]
+    let clients: [ExportClient]
+}
+
+struct ExportEntry: Codable {
+    let id: String
+    let type: String
+    let date: String
+    let description: String
+    let clientID: String?
+    let isComplete: Bool
+    let amount: Decimal?
+    let tag: String
+    
+    init(from entry: LogEntry) {
+        self.id = entry.id?.uuidString ?? ""
+        
+        // Convert Int16 type to a readable string using LogEntryType's displayName
+        let typeValue = entry.type
+        if let entryType = LogEntryType(rawValue: typeValue) {
+            self.type = entryType.displayName
+        } else {
+            self.type = "Unknown"
+        }
+        
+        let dateFormatter = ISO8601DateFormatter()
+        self.date = entry.date != nil ? dateFormatter.string(from: entry.date!) : ""
+        
+        self.description = entry.desc ?? ""
+        self.clientID = entry.client?.id?.uuidString
+        self.isComplete = entry.isComplete
+        self.amount = entry.amount as Decimal?
+        self.tag = entry.tag ?? ""
+    }
+}
+
+struct ExportClient: Codable {
+    let id: String
+    let name: String
+    let tag: String
+    let hourlyRate: Decimal
+    
+    init(from client: Client) {
+        self.id = client.id?.uuidString ?? ""
+        self.name = client.name ?? ""
+        self.tag = client.tag ?? ""
+        self.hourlyRate = client.hourlyRate as Decimal? ?? 0
+    }
+}
+
+// Share sheet to present platform share UI
 struct ShareSheet: UIViewControllerRepresentable {
-    var items: [Any]
+    let items: [Any]
+    let fileName: String
+    let contentType: UTType
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        let controller = UIActivityViewController(activityItems: items, applicationActivities: nil)
-        return controller
+        // Create a temporary URL for the file
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent(fileName)
+        
+        // Write the data to the file
+        if let data = items.first as? Data {
+            try? data.write(to: fileURL)
+            
+            // Create an activity view controller with the file URL
+            let activityVC = UIActivityViewController(
+                activityItems: [fileURL],
+                applicationActivities: nil
+            )
+            
+            // Configure excluded activity types if needed
+            activityVC.excludedActivityTypes = [
+                .assignToContact,
+                .addToReadingList
+            ]
+            
+            return activityVC
+        } else {
+            // Fallback to just sharing the items directly
+            let activityVC = UIActivityViewController(
+                activityItems: items,
+                applicationActivities: nil
+            )
+            return activityVC
+        }
     }
     
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {
+        // Nothing to update
+    }
 }
 
 #Preview {
     NavigationStack {
         ExportView()
-            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
     }
 } 
