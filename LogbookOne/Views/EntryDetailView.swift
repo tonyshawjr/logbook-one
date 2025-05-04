@@ -1,14 +1,13 @@
 import SwiftUI
 import CoreData
 
-
-
 struct EntryDetailView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
     @ObservedObject var entry: LogEntry
     @State private var showingEditSheet = false
     @State private var showingDeleteConfirmation = false
+    @State private var showingReschedulePicker = false
     @State private var isComplete: Bool = false
     
     private let dateFormatter: DateFormatter = {
@@ -18,31 +17,70 @@ struct EntryDetailView: View {
         return formatter
     }()
     
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
-                // Entry type header
-                entryHeader
-                
-                // Entry details card
-                entryDetailsCard
-                
-                // Client info
-                if let client = entry.client {
-                    clientInfoCard(client: client)
+                // Task description card with completion circle (for tasks)
+                if entry.type == LogEntryType.task.rawValue {
+                    taskCard
+                } else {
+                    // For non-task entries, show description without completion circle
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(entry.desc ?? "No description")
+                            .font(.system(.title3, design: .rounded))
+                            .foregroundColor(.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color.cardBackground)
+                            .cornerRadius(16)
+                    }
+                    .padding(.horizontal)
                 }
                 
-                // Action buttons
-                actionButtons
+                // Client section (if assigned)
+                if let client = entry.client {
+                    clientSection(client: client)
+                }
                 
-                Spacer()
+                // Amount section (for payments)
+                if entry.type == LogEntryType.payment.rawValue,
+                   let amount = entry.amount as NSDecimalNumber?,
+                   amount.doubleValue > 0 {
+                    amountSection(amount: amount)
+                }
+                
+                // Tag section (if exists)
+                if let tag = entry.tag, !tag.isEmpty {
+                    tagSection(tag: tag)
+                }
+                
+                Spacer(minLength: 40)
+                
+                // Reschedule button (for tasks)
+                if entry.type == LogEntryType.task.rawValue {
+                    rescheduleButton
+                }
             }
-            .padding(.vertical)
+            .padding(.vertical, 16)
         }
         .background(Color.appBackground)
-        .navigationTitle(entryTypeTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                if entry.type != LogEntryType.task.rawValue {
+                    // Only show the type for notes and payments
+                    Text(entryTypeTitle)
+                        .font(.headline)
+                        .foregroundColor(.primaryText)
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(action: { showingEditSheet = true }) {
@@ -53,15 +91,30 @@ struct EntryDetailView: View {
                         Label("Delete", systemImage: "trash")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis")
                         .font(.headline)
+                        .foregroundColor(.primaryText)
+                        .padding(8)
+                        .contentShape(Rectangle())
                 }
             }
         }
         .sheet(isPresented: $showingEditSheet) {
-            // Pass the entry to LogEntryFormView for editing
+            // Pass the entry to EditEntryView for editing
             EditEntryView(entry: entry)
                 .environment(\.managedObjectContext, viewContext)
+        }
+        .sheet(isPresented: $showingReschedulePicker) {
+            TaskDatePickerView(selectedDate: Binding(
+                get: { entry.date ?? Date() },
+                set: { newDate in
+                    entry.date = newDate
+                    try? viewContext.save()
+                }
+            ))
+            .presentationDragIndicator(.hidden)
+            .presentationBackground(Color(uiColor: .systemBackground))
+            .presentationCornerRadius(24)
         }
         .alert("Delete Entry", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -76,227 +129,190 @@ struct EntryDetailView: View {
         }
     }
     
-    private var entryHeader: some View {
-        HStack {
-            EntryTypeBadgeView(type: LogEntryType(rawValue: entry.type) ?? .task)
-                .scaleEffect(1.2)
-            
-            Spacer()
-            
-            if let date = entry.date {
-                Text(dateFormatter.string(from: date))
-                    .font(.appSubheadline)
-                    .foregroundColor(.secondaryText)
-            }
-        }
-        .padding(.horizontal)
-    }
-    
-    private var entryDetailsCard: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            // Description
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Description")
-                    .font(.appSubheadline)
-                    .foregroundColor(.secondaryText)
-                
-                Text(entry.desc ?? "No description")
-                    .font(.appBody)
-                    .foregroundColor(.primaryText)
-            }
-            
-            Divider()
-            
-            // Task completion status (if task)
-            if entry.type == LogEntryType.task.rawValue {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Status")
-                        .font(.appSubheadline)
-                        .foregroundColor(.secondaryText)
-                    
-                    Toggle(isOn: $isComplete.animation()) {
-                        Text(isComplete ? "Completed" : "Not Completed")
-                            .font(.appBody)
-                            .foregroundColor(isComplete ? .success : .primaryText)
-                    }
-                    .toggleStyle(SwitchToggleStyle(tint: .appAccent))
-                    .onChange(of: isComplete) { oldValue, newValue in
-                        entry.isComplete = newValue
-                        do {
-                            try viewContext.save()
-                            
-                            // Add haptic feedback for task completion
-                            let generator = UIImpactFeedbackGenerator(style: .medium)
-                            generator.impactOccurred()
-                        } catch {
-                            print("Error saving task completion status: \(error)")
+    // Task card with completion circle and due date
+    private var taskCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Completion circle and description on the same line
+            HStack(alignment: .top, spacing: 12) {
+                Button(action: toggleCompletion) {
+                    ZStack {
+                        Circle()
+                            .stroke(isComplete ? Color.appAccent : Color.gray.opacity(0.4), lineWidth: 2)
+                            .frame(width: 28, height: 28)
+                        
+                        if isComplete {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.appAccent)
                         }
                     }
                 }
+                .buttonStyle(PlainButtonStyle())
                 
-                Divider()
+                // Task description
+                Text(entry.desc ?? "No description")
+                    .font(.system(.title3, design: .rounded))
+                    .foregroundColor(isComplete ? .secondary : .primaryText)
+                    .strikethrough(isComplete)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
             
-            // Amount (for payment)
-            if entry.type == LogEntryType.payment.rawValue,
-               let amount = entry.amount as NSDecimalNumber?,
-               amount.doubleValue > 0 {
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Amount")
-                        .font(.appSubheadline)
-                        .foregroundColor(.secondaryText)
+            // Due date (if set)
+            if let dueDate = entry.date {
+                HStack {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 14))
+                        .foregroundColor(.appAccent)
                     
-                    let amountValue = amount.doubleValue
-                    Text("$\(amountValue, specifier: "%.2f")")
-                        .font(.system(.title2, design: .default).weight(.bold))
-                        .foregroundColor(.paymentColor)
-                }
-                
-                Divider()
-            }
-            
-            // Tag (if exists)
-            if let tag = entry.tag, !tag.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Tag")
-                        .font(.appSubheadline)
+                    Text(dateFormatter.string(from: dueDate))
+                        .font(.subheadline)
                         .foregroundColor(.secondaryText)
-                    
-                    Text(tag)
-                        .font(.appBody)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(8)
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, 16)
+                .padding(.leading, 40) // Align with the description text
             }
         }
-        .padding()
         .background(Color.cardBackground)
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
         .padding(.horizontal)
     }
     
-    private func clientInfoCard(client: Client) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+    // Client section
+    private func clientSection(client: Client) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
             Text("Client")
-                .font(.appSubheadline)
+                .font(.subheadline)
                 .foregroundColor(.secondaryText)
+                .padding(.horizontal)
             
-            HStack(spacing: 12) {
-                // Client avatar
-                ZStack {
-                    Circle()
-                        .fill(Color.appAccent.opacity(0.12))
-                        .frame(width: 40, height: 40)
-                    
-                    Text(clientInitials(from: client))
-                        .font(.system(.subheadline, design: .rounded).weight(.semibold))
-                        .foregroundColor(Color.appAccent)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(client.name ?? "Unnamed Client")
-                        .font(.appHeadline)
-                    
-                    if let tag = client.tag, !tag.isEmpty {
-                        Text(tag)
-                            .font(.appCaption)
-                            .foregroundColor(.secondaryText)
+            NavigationLink(destination: ClientDetailView(client: client)) {
+                HStack(spacing: 12) {
+                    // Client avatar
+                    ZStack {
+                        Circle()
+                            .fill(Color.appAccent.opacity(0.12))
+                            .frame(width: 36, height: 36)
+                        
+                        Text(clientInitials(from: client))
+                            .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                            .foregroundColor(Color.appAccent)
                     }
+                    
+                    Text(client.name ?? "Unnamed Client")
+                        .font(.system(.body, design: .rounded))
+                        .foregroundColor(.primaryText)
+                    
+                    Spacer()
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
+                .padding()
+                .background(Color.cardBackground)
+                .cornerRadius(16)
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(.horizontal)
+    }
+    
+    // Amount section for payments
+    private func amountSection(amount: NSDecimalNumber) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Amount")
+                .font(.subheadline)
+                .foregroundColor(.secondaryText)
+                .padding(.horizontal)
+            
+            HStack {
+                Text("$\(amount.doubleValue, specifier: "%.2f")")
+                    .font(.system(.title2, design: .rounded).weight(.bold))
+                    .foregroundColor(.appAccent)
                 
                 Spacer()
-                
-                NavigationLink(destination: ClientDetailView(client: client)) {
-                    Text("View")
-                        .font(.appCaption.weight(.medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.appAccent.opacity(0.1))
-                        .foregroundColor(.appAccent)
-                        .cornerRadius(8)
-                }
             }
+            .padding()
+            .background(Color.cardBackground)
+            .cornerRadius(16)
         }
-        .padding()
-        .background(Color.cardBackground)
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 3, x: 0, y: 1)
         .padding(.horizontal)
     }
     
-    private var actionButtons: some View {
-        VStack(spacing: 12) {
-            // In the future, you can add more action buttons here
-            // For now, keeping it simple with just the share button
+    // Tag section
+    private func tagSection(tag: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Tag")
+                .font(.subheadline)
+                .foregroundColor(.secondaryText)
+                .padding(.horizontal)
             
-            Button(action: {
-                // Share this entry
-                let entryText = createShareText()
-                let activityViewController = UIActivityViewController(
-                    activityItems: [entryText],
-                    applicationActivities: nil
-                )
+            HStack {
+                Text(tag)
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.primaryText)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(
+                        Capsule()
+                            .fill(Color.appAccent.opacity(0.1))
+                    )
                 
-                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                   let rootVC = windowScene.windows.first?.rootViewController {
-                    rootVC.present(activityViewController, animated: true)
-                }
-            }) {
-                Label("Share Entry", systemImage: "square.and.arrow.up")
-                    .font(.appHeadline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.cardBackground)
-                    .foregroundColor(.appAccent)
-                    .cornerRadius(12)
+                Spacer()
             }
+            .padding()
+            .background(Color.cardBackground)
+            .cornerRadius(16)
+        }
+        .padding(.horizontal)
+    }
+    
+    // Reschedule button at the bottom
+    private var rescheduleButton: some View {
+        Button(action: { showingReschedulePicker = true }) {
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                Text("Reschedule")
+            }
+            .font(.system(.headline, design: .rounded))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.appAccent)
+            )
             .padding(.horizontal)
-            .padding(.top, 8)
         }
     }
     
-    private func createShareText() -> String {
-        var text = "LogbookOne Entry\n\n"
-        
-        let typeName = LogEntryType(rawValue: entry.type)?.displayName ?? "Unknown"
-        text += "Type: " + typeName + "\n"
-        
-        if let date = entry.date {
-            let dateStr = dateFormatter.string(from: date)
-            text += "Date: " + dateStr + "\n"
+    // MARK: - Helper Functions
+    
+    private func toggleCompletion() {
+        withAnimation {
+            isComplete.toggle()
+            entry.isComplete = isComplete
+            
+            do {
+                try viewContext.save()
+                
+                // Add haptic feedback
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+            } catch {
+                print("Error saving task completion status: \(error)")
+            }
         }
-        
-        if let client = entry.client {
-            let clientName = client.name ?? "Unnamed Client"
-            text += "Client: " + clientName + "\n"
-        }
-        
-        let description = entry.desc ?? ""
-        text += "Description: " + description + "\n"
-        
-        if entry.type == LogEntryType.payment.rawValue,
-           let amount = entry.amount as NSDecimalNumber?,
-           amount.doubleValue > 0 {
-            let amountValue = amount.doubleValue
-            let formattedAmount = String(format: "$%.2f", amountValue)
-            text += "Amount: \(formattedAmount)\n"
-        }
-        
-        if let tag = entry.tag, !tag.isEmpty {
-            text += "Tag: " + tag + "\n"
-        }
-        
-        return text
     }
     
     private var entryTypeTitle: String {
         switch LogEntryType(rawValue: entry.type) {
         case .task:
-            return "Task"
+            return ""
         case .note:
             return "Note"
         case .payment:
@@ -321,6 +337,12 @@ struct EntryDetailView: View {
         }
     }
     
+    private func timeAgo(from date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+    
     private func deleteEntry() {
         viewContext.delete(entry)
         
@@ -339,126 +361,229 @@ struct EditEntryView: View {
     @ObservedObject var entry: LogEntry
     
     @State private var description: String = ""
-    @State private var amount: String = ""
-    @State private var tag: String = ""
-    @State private var isComplete: Bool = false
     @State private var selectedClient: Client?
     @State private var entryDate: Date = Date()
+    @State private var showDueDate: Bool = false
+    @State private var showDatePicker: Bool = false
+    @State private var showClientPicker: Bool = false
     @State private var showingSavedAnimation = false
-    @State private var selectedType: LogEntryType = .task
+    
+    // For auto-focusing the text field
+    @FocusState private var isDescriptionFocused: Bool
     
     @FetchRequest(
         sortDescriptors: [NSSortDescriptor(keyPath: \Client.name, ascending: true)],
         animation: .default)
     private var clients: FetchedResults<Client>
     
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
     var body: some View {
-        NavigationStack {
-            ZStack {
-                Form {
-                    Section(header: Text("Entry Details")) {
-                        Picker("Type", selection: $selectedType) {
-                            ForEach(LogEntryType.allCases) { type in
-                                Text(type.displayName).tag(type)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        
-                        Picker("Client", selection: $selectedClient) {
-                            Text("No Client").tag(nil as Client?)
-                            ForEach(clients) { client in
-                                Text(client.name ?? "Unnamed Client").tag(client as Client?)
-                            }
-                        }
-                        
-                        DatePicker("Date", selection: $entryDate, displayedComponents: [.date, .hourAndMinute])
-                        
-                        TextField("Description", text: $description, axis: .vertical)
-                            .lineLimit(3...6)
-                        
-                        if selectedType == .payment {
-                            TextField("Amount ($)", text: $amount)
-                                .keyboardType(.decimalPad)
-                        }
-                        
-                        if selectedType == .task {
-                            Toggle("Completed", isOn: $isComplete)
-                        }
-                        
-                        TextField("Tag (optional)", text: $tag)
-                    }
-                }
-                .navigationTitle("Edit Entry")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") {
-                            dismiss()
-                        }
-                    }
+        ZStack {
+            // Full-screen background
+            Color(uiColor: .systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 0) {
+                // Header with close and save buttons
+                HStack {
+                    Text("Edit Task")
+                        .font(.headline)
+                        .foregroundColor(.primaryText)
                     
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Save") {
-                            saveChanges()
+                    Spacer()
+                    
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 16)
+                
+                // Description field
+                TextField("Description", text: $description, axis: .vertical)
+                    .font(.title3)
+                    .padding(.horizontal)
+                    .padding(.top, 16)
+                    .focused($isDescriptionFocused)
+                    .frame(height: 120)
+                
+                Spacer()
+                
+                // Bottom area with client and date selection on same line
+                VStack(spacing: 16) {
+                    // Client and date row
+                    HStack(spacing: 12) {
+                        // Client selection
+                        Button(action: {
+                            showClientPicker = true
+                        }) {
+                            HStack {
+                                Text(selectedClient?.name ?? "Select Client")
+                                    .foregroundColor(selectedClient != nil ? .primary : .secondary)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(height: 44)
+                            .padding(.horizontal, 12)
+                            .background(Color(UIColor.secondarySystemBackground))
+                            .cornerRadius(8)
+                        }
+                        
+                        // Due date selection
+                        if showDueDate {
+                            Button(action: {
+                                showDatePicker = true
+                            }) {
+                                HStack {
+                                    if Calendar.current.isDateInToday(entryDate) {
+                                        Text("Today")
+                                            .foregroundColor(.appAccent)
+                                    } else if Calendar.current.isDateInTomorrow(entryDate) {
+                                        Text("Tomorrow")
+                                            .foregroundColor(.appAccent)
+                                    } else {
+                                        Text(formattedDate(entryDate))
+                                            .foregroundColor(.appAccent)
+                                            .lineLimit(1)
+                                    }
+                                    
+                                    Image(systemName: "calendar")
+                                        .foregroundColor(.appAccent)
+                                        .font(.system(size: 14))
+                                        .padding(.leading, 2)
+                                }
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                                .background(Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(8)
+                            }
+                            
+                            // Delete date button
+                            Button(action: {
+                                showDueDate = false
+                                entryDate = Date()
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                                    .font(.system(size: 18))
+                            }
+                            .padding(.leading, -8)
+                        } else {
+                            // Add due date button
+                            Button(action: {
+                                showDueDate = true
+                                showDatePicker = true
+                            }) {
+                                HStack {
+                                    Image(systemName: "calendar.badge.plus")
+                                        .foregroundColor(.appAccent)
+                                    Text("Add Due Date")
+                                        .foregroundColor(.appAccent)
+                                }
+                                .padding(.horizontal, 12)
+                                .frame(height: 44)
+                                .background(Color(UIColor.secondarySystemBackground))
+                                .cornerRadius(8)
+                            }
                         }
                     }
-                }
-                
-                // Save confirmation overlay
-                if showingSavedAnimation {
-                    VStack {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 70))
-                            .foregroundColor(.appAccent)
-                        
-                        Text("Saved!")
-                            .font(.title2.weight(.medium))
-                            .foregroundColor(.appAccent)
-                            .padding(.top, 8)
+                    .padding(.horizontal)
+                    
+                    // Save button
+                    Button(action: saveChanges) {
+                        Text("Save Changes")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(Color.appAccent)
+                            )
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color.black.opacity(0.2))
-                    .ignoresSafeArea()
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
                 }
+                .padding(.bottom, 16)
             }
-            .onAppear {
-                // Load entry values
-                loadEntryValues()
+            
+            // Save confirmation overlay
+            if showingSavedAnimation {
+                VStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 70))
+                        .foregroundColor(.appAccent)
+                    
+                    Text("Saved!")
+                        .font(.title2.weight(.medium))
+                        .foregroundColor(.appAccent)
+                        .padding(.top, 8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black.opacity(0.2))
+                .ignoresSafeArea()
+            }
+        }
+        .sheet(isPresented: $showDatePicker) {
+            TaskDatePickerView(selectedDate: $entryDate)
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Color(uiColor: .systemBackground))
+                .presentationCornerRadius(24)
+        }
+        .sheet(isPresented: $showClientPicker) {
+            TaskClientPickerView(selectedClient: $selectedClient)
+        }
+        .onAppear {
+            // Load entry values
+            loadEntryValues()
+            
+            // Auto-focus the description field
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isDescriptionFocused = true
             }
         }
     }
     
     private func loadEntryValues() {
         // Set values from the entry
-        selectedType = LogEntryType(rawValue: entry.type) ?? .task
         description = entry.desc ?? ""
-        entryDate = entry.date ?? Date()
-        tag = entry.tag ?? ""
-        isComplete = entry.isComplete
         selectedClient = entry.client
         
-        if let amountValue = entry.amount as NSDecimalNumber? {
-            amount = amountValue.doubleValue > 0 ? String(format: "%.2f", amountValue.doubleValue) : ""
+        // Handle date
+        if let date = entry.date {
+            entryDate = date
+            showDueDate = true
+        } else {
+            showDueDate = false
+            entryDate = Date().addingTimeInterval(86400) // Tomorrow
         }
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        if Calendar.current.isDate(date, equalTo: Date(), toGranularity: .year) {
+            formatter.dateFormat = "MMM d"
+        } else {
+            formatter.dateFormat = "MMM d, yyyy"
+        }
+        return formatter.string(from: date)
     }
     
     private func saveChanges() {
         // Update entry with new values
-        entry.type = selectedType.rawValue
         entry.desc = description
-        entry.date = entryDate
-        entry.tag = tag.isEmpty ? nil : tag
+        entry.date = showDueDate ? entryDate : nil
         entry.client = selectedClient
-        
-        if selectedType == .task {
-            entry.isComplete = isComplete
-        }
-        
-        if selectedType == .payment, let amountValue = Decimal(string: amount) {
-            entry.amount = NSDecimalNumber(decimal: amountValue)
-        } else {
-            entry.amount = NSDecimalNumber.zero
-        }
+        // We're not updating tag or isComplete here
         
         do {
             try viewContext.save()
@@ -482,15 +607,82 @@ struct EditEntryView: View {
     }
 }
 
+// Helper view for client selection
+struct TaskClientPickerView: View {
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.managedObjectContext) private var viewContext
+    @Binding var selectedClient: Client?
+    
+    @FetchRequest(
+        sortDescriptors: [NSSortDescriptor(keyPath: \Client.name, ascending: true)],
+        animation: .default)
+    private var clients: FetchedResults<Client>
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                Button(action: {
+                    selectedClient = nil
+                    dismiss()
+                }) {
+                    HStack {
+                        Text("No Client")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if selectedClient == nil {
+                            Image(systemName: "checkmark")
+                                .foregroundColor(.appAccent)
+                        }
+                    }
+                }
+                
+                ForEach(clients) { client in
+                    Button(action: {
+                        selectedClient = client
+                        dismiss()
+                    }) {
+                        HStack {
+                            Text(client.name ?? "Unnamed Client")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if selectedClient == client {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.appAccent)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Select Client")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
 #Preview {
     let context = PersistenceController.preview.container.viewContext
     let entry = LogEntry(context: context)
     entry.id = UUID()
-    entry.type = LogEntryType.payment.rawValue
-    entry.desc = "Website design project milestone completed"
-    entry.date = Date()
-    entry.amount = NSDecimalNumber(value: 250.00)
+    entry.type = LogEntryType.task.rawValue
+    entry.desc = "Design new landing page for client website with modern aesthetic and improved user flows"
+    entry.date = Date().addingTimeInterval(86400) // Tomorrow
     entry.tag = "Design"
+    
+    // Create a client
+    let client = Client(context: context)
+    client.id = UUID()
+    client.name = "Acme Corp"
+    client.tag = "Tech"
+    
+    // Assign client to entry
+    entry.client = client
     
     return NavigationStack {
         EntryDetailView(entry: entry)

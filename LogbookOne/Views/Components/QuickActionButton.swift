@@ -11,20 +11,36 @@ struct QuickActionButton: View {
             HStack {
                 Spacer()
                 Button(action: {
+                    // Use haptic feedback when pressing button
+                    let impactMed = UIImpactFeedbackGenerator(style: .medium)
+                    impactMed.impactOccurred()
+                    
                     showingSheet = true
                 }) {
                     Image(systemName: "plus")
-                        .font(.title2.bold())
+                        .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 60, height: 60)
-                        .background(Color.appAccent)
-                        .clipShape(Circle())
-                        .shadow(color: Color.appAccent.opacity(0.3), radius: 5, x: 0, y: 3)
+                        .background(
+                            Circle()
+                                .fill(Color.appAccent)
+                                .shadow(color: Color.appAccent.opacity(0.3), radius: 5, x: 0, y: 3)
+                        )
                 }
+                .buttonStyle(ScaleButtonStyle())
                 .padding(.trailing, 20)
                 .padding(.bottom, 80) // Position above tab bar
             }
         }
+    }
+}
+
+// Custom button style for smoother press animation
+struct ScaleButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(.easeOut(duration: 0.2), value: configuration.isPressed)
     }
 }
 
