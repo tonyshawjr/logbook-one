@@ -29,7 +29,7 @@ struct QuickActionButton: View {
                 }
                 .buttonStyle(ScaleButtonStyle())
                 .padding(.trailing, 20)
-                .padding(.bottom, 80) // Position above tab bar
+                .padding(.bottom, 150) // Position above tab bar
             }
         }
     }

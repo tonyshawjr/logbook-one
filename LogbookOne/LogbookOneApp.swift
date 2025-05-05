@@ -16,6 +16,9 @@ struct LogbookOneApp: App {
     @AppStorage("useDarkMode") private var useDarkMode = false
     @AppStorage("useSystemAppearance") private var useSystemAppearance = true
     
+    // Create a shared ClientFormState instance
+    @StateObject private var clientFormState = ClientFormState()
+    
     init() {
         // Fix for existing entries that don't have a creation date
         updateExistingEntriesWithMissingCreationDate()
@@ -32,6 +35,7 @@ struct LogbookOneApp: App {
             ContentView()
                 .environment(\.managedObjectContext, persistenceController.container.viewContext)
                 .preferredColorScheme(colorScheme)
+                .environmentObject(clientFormState)
                 .onAppear {
                     // Force UI update when app appears to apply any appearance changes
                     configureAppearance()
@@ -91,21 +95,31 @@ struct LogbookOneApp: App {
         UINavigationBar.appearance().scrollEdgeAppearance = navBarAppearance
         UINavigationBar.appearance().tintColor = UIColor(named: "themeAccent")
         
-        // We're handling tab bar appearance directly in ContentView.swift
-        // Removing all tab bar appearance code from here to avoid conflicts
+        // Configure tab bar appearance for 6 tabs
+        let tabBarAppearance = UITabBarAppearance()
+        tabBarAppearance.configureWithDefaultBackground()
+        
+        // Adjust the tab bar item appearance
+        let itemAppearance = UITabBarItemAppearance()
+        
+        // Make the text a bit smaller for 6 tabs
+        itemAppearance.normal.titleTextAttributes = [.font: UIFont.systemFont(ofSize: 10, weight: .medium)]
+        itemAppearance.selected.titleTextAttributes = [.font: UIFont.systemFont(ofSize: 10, weight: .semibold)]
+        
+        // Make sure to use theme accent color for selected tabs
+        UITabBar.appearance().tintColor = UIColor(named: "themeAccent")
+        
+        // Apply the item appearance to the tab bar
+        tabBarAppearance.stackedLayoutAppearance = itemAppearance
+        tabBarAppearance.inlineLayoutAppearance = itemAppearance
+        tabBarAppearance.compactInlineLayoutAppearance = itemAppearance
+        
+        UITabBar.appearance().standardAppearance = tabBarAppearance
+        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
         
         // Configure other UI components as needed
         UITableView.appearance().backgroundColor = UIColor(named: "themeBackground")
         UITableViewCell.appearance().backgroundColor = UIColor(named: "themeCard")
-        
-        // Apply tab bar customizations at runtime
-        // Disabling custom tab bar spacing adjustments as they're causing layout issues
-        /*
-        NotificationCenter.default.addObserver(forName: UIApplication.didFinishLaunchingNotification, 
-                                              object: nil, queue: .main) { _ in
-            self.adjustTabBarItemSpacing()
-        }
-        */
     }
     
     /// Adjust tab bar item spacing after the app has launched
