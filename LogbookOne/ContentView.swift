@@ -35,7 +35,7 @@ extension Notification.Name {
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    
+
     var body: some View {
         ZStack {
             if hasCompletedOnboarding {
@@ -211,49 +211,6 @@ struct MainTabView: View {
                 }
             }
             .ignoresSafeArea(.all)
-        }
-        .sheet(isPresented: $showingQuickAdd) {
-            Group {
-                switch selectedTab {
-                case 0: // Dashboard
-                    QuickAddView()
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
-                case 1: // Tasks
-                    QuickAddView(initialEntryType: .task)
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
-                case 2: // Notes
-                    QuickAddView(initialEntryType: .note)
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
-                case 3: // Payments
-                    QuickAddView(initialEntryType: .payment)
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
-                default:
-                    // Fallback for any other tab (though this shouldn't happen)
-                    QuickAddView()
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
-                }
-            }
-            .presentationDragIndicator(.hidden)
-            .presentationDetents([.height(420)])
-            .presentationBackground(Color(uiColor: .systemBackground))
-            .presentationCornerRadius(24)
-            .interactiveDismissDisabled(false)
-            .environment(\.managedObjectContext, viewContext)
         }
         // Global client form presentation
         .sheet(isPresented: $clientFormState.showingAddClient) {
