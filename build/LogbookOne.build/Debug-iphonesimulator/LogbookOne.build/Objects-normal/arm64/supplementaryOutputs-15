@@ -1,0 +1,18 @@
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/ClientListView.swift":
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientListView.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientListView.dia"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientListView.swiftconstvalues"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientListView.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientListView.d"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Utils/PurchaseManager.swift":
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/PurchaseManager.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/PurchaseManager.swiftconstvalues"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/PurchaseManager.swiftdeps"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/PurchaseManager.o"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/PurchaseManager.dia"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Utils/ViewEffects.swift":
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ViewEffects.dia"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ViewEffects.swiftconstvalues"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ViewEffects.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ViewEffects.d"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ViewEffects.swiftdeps"

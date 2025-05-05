@@ -1,0 +1,18 @@
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/LogbookOneApp.swift":
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogbookOneApp.dia"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogbookOneApp.swiftdeps"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogbookOneApp.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogbookOneApp.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogbookOneApp.swiftconstvalues"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/ExportView.swift":
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ExportView.dia"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ExportView.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ExportView.swiftconstvalues"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ExportView.o"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ExportView.swiftdeps"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/SettingsView.swift":
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/SettingsView.dia"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/SettingsView.d"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/SettingsView.swiftdeps"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/SettingsView.swiftconstvalues"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/SettingsView.o"

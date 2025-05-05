@@ -1,0 +1,24 @@
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Utils/NagModeManager.swift":
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/NagModeManager.d"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/NagModeManager.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/NagModeManager.dia"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/NagModeManager.swiftconstvalues"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/NagModeManager.o"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/Components/UpgradePromptView.swift":
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradePromptView.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradePromptView.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradePromptView.swiftconstvalues"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradePromptView.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradePromptView.dia"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Models/ClientFormState.swift":
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ClientFormState.swiftconstvalues"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ClientFormState.dia"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ClientFormState.d"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ClientFormState.o"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/ClientFormState.swiftdeps"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/UpgradeView.swift":
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradeView.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradeView.dia"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradeView.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradeView.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/UpgradeView.swiftconstvalues"

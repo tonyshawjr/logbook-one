@@ -1,0 +1,24 @@
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/UpgradeView.swift":
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradeView.o"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradeView.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradeView.dia"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradeView.swiftconstvalues"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradeView.d"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Utils/NagModeManager.swift":
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/NagModeManager.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/NagModeManager.swiftconstvalues"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/NagModeManager.dia"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/NagModeManager.o"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/NagModeManager.swiftdeps"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Views/Components/UpgradePromptView.swift":
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradePromptView.swiftdeps"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradePromptView.d"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradePromptView.dia"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradePromptView.o"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/UpgradePromptView.swiftconstvalues"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Models/ClientFormState.swift":
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientFormState.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientFormState.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientFormState.swiftconstvalues"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientFormState.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/arm64/ClientFormState.dia"

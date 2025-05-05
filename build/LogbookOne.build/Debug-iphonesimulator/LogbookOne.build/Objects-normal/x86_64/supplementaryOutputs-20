@@ -1,0 +1,18 @@
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/DerivedSources/CoreDataGenerated/LogbookOne/Client+CoreDataProperties.swift":
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataProperties.dia"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataProperties.swiftconstvalues"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataProperties.o"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataProperties.d"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataProperties.swiftdeps"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/DerivedSources/CoreDataGenerated/LogbookOne/Client+CoreDataClass.swift":
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataClass.dia"
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataClass.o"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataClass.swiftdeps"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataClass.d"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/Client+CoreDataClass.swiftconstvalues"
+"/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/DerivedSources/CoreDataGenerated/LogbookOne/LogEntry+CoreDataClass.swift":
+  object: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogEntry+CoreDataClass.o"
+  const-values: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogEntry+CoreDataClass.swiftconstvalues"
+  swift-dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogEntry+CoreDataClass.swiftdeps"
+  diagnostics: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogEntry+CoreDataClass.dia"
+  dependencies: "/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/build/LogbookOne.build/Debug-iphonesimulator/LogbookOne.build/Objects-normal/x86_64/LogEntry+CoreDataClass.d"

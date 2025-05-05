@@ -8,6 +8,21 @@ struct QuickActionButton: View {
     @Binding var showingSheet: Bool
     var currentTab: Int
     @ObservedObject private var nagManager = NagModeManager.shared
+    @ObservedObject private var purchaseManager = PurchaseManager.shared
+    
+    // Check if the current tab is premium and accessible
+    private var isPremiumTab: Bool {
+        switch currentTab {
+        case 1: // Tasks
+            return purchaseManager.hasAccess(to: .tasks) == false
+        case 3: // Payments
+            return purchaseManager.hasAccess(to: .payments) == false
+        case 4: // Clients
+            return purchaseManager.hasAccess(to: .clients) == false
+        default:
+            return false
+        }
+    }
     
     var body: some View {
         // Only render actual content if we're on an allowed tab
@@ -21,11 +36,13 @@ struct QuickActionButton: View {
                         let impactMed = UIImpactFeedbackGenerator(style: .medium)
                         impactMed.impactOccurred()
                         
-                        // Show the appropriate quick add sheet
+                        // If it's a premium tab and we don't have access, still show the sheet
+                        // The sheet will handle showing the upgrade prompt
                         showingSheet = true
                         
                         // Tell NagMode that the user is logging an entry
-                        if nagManager.showInAppNag {
+                        // Only if we're not on a premium tab or we have access
+                        if nagManager.showInAppNag && !isPremiumTab {
                             nagManager.userLoggedEntry()
                         }
                     }) {

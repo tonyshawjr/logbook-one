@@ -1,8 +1,50 @@
 import SwiftUI
 import CoreData
-
-// Import HashtagExtractor utility
 import Foundation
+
+
+// Extension to provide access to purchase manager functions
+extension LogEntryType {
+    var requiresPremium: Bool {
+        switch self {
+        case .task:
+            return true
+        case .payment:
+            return true
+        case .note:
+            return false
+        }
+    }
+    
+    var associatedProFeature: ProFeature? {
+        switch self {
+        case .task:
+            return .tasks
+        case .payment:
+            return .payments
+        case .note:
+            return nil
+        }
+    }
+    
+    // Helper to check if the current user has access to this entry type
+    func hasAccess() -> Bool {
+        switch self {
+        case .task:
+            // Check UserDefaults instead of directly accessing PurchaseManager
+            let isPro = UserDefaults.standard.bool(forKey: "com.logbookone.isPro")
+            let isTestMode = UserDefaults.standard.bool(forKey: "com.logbookone.isTestMode")
+            return isPro || isTestMode
+        case .payment:
+            // Check UserDefaults instead of directly accessing PurchaseManager
+            let isPro = UserDefaults.standard.bool(forKey: "com.logbookone.isPro")
+            let isTestMode = UserDefaults.standard.bool(forKey: "com.logbookone.isTestMode")
+            return isPro || isTestMode
+        case .note:
+            return true // Notes are always accessible
+        }
+    }
+}
 
 // Task Date Picker View
 struct TaskDatePickerView: View {
@@ -497,49 +539,65 @@ struct QuickAddView: View {
     
     private let notePrompts = [
         "What's on your mind?",
-        "Brain won't shut up? Start here",
-        "What just popped into your head?",
-        "Drop it before it disappears",
-        "Type it now, sort it later",
-        "Throw it in here for now",
-        "Don't trust your memory, trust this.",
-        "Quick idea? Toss it in."
+        "Jot down your thoughts",
+        "Write it down before you forget",
+        "Capture your ideas here",
+        "What should you remember?",
+        "Make a quick note",
+        "What happened today?",
+        "Anything interesting?"
     ]
     
     private let paymentPrompts = [
-        "What needs logged right now?",
         "What was this payment for?",
-        "Record a payment quickly",
-        "Client payment to track?",
-        "What's the money for?",
-        "Log your income",
-        "Quick payment entry",
-        "What service did you provide?"
+        "Describe the invoice or project",
+        "Note what this payment covers",
+        "What did the client pay for?",
+        "Summarize the work completed",
+        "What did you get paid for?",
+        "Payment received for what?"
     ]
     
-    // Initialize with the last used type
+    // Initialize with default values
     init() {
-        let savedType = UserDefaults.standard.integer(forKey: "lastUsedEntryType")
-        _selectedType = State(initialValue: LogEntryType(rawValue: Int16(savedType)) ?? .task)
-        _showDueDate = State(initialValue: false) // Explicitly start with no due date
+        // Default to note type (always accessible)
+        self._selectedType = State(initialValue: .note)
+        self._showDueDate = State(initialValue: false)
     }
     
-    // Initialize with a specific entry type (for context-aware quick add)
+    // Initialize with a specific type
     init(initialEntryType: LogEntryType) {
-        _selectedType = State(initialValue: initialEntryType)
-        _showDueDate = State(initialValue: false) // Default to false for unscheduled tasks
-        // Still save this as the last used type
-        UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
+        // If the type requires premium access and user doesn't have access, default to note type
+        if initialEntryType.requiresPremium && !initialEntryType.hasAccess() {
+            self._selectedType = State(initialValue: .note)
+        } else {
+            self._selectedType = State(initialValue: initialEntryType)
+        }
+        self._showDueDate = State(initialValue: initialEntryType == .task)
+        
+        // Save as last used type if accessible
+        if !initialEntryType.requiresPremium || initialEntryType.hasAccess() {
+            UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
+        }
     }
     
     // Initialize with a specific entry type and initial date (for tasks)
     init(initialEntryType: LogEntryType, initialDate: Date) {
-        _selectedType = State(initialValue: initialEntryType)
-        _dueDate = State(initialValue: initialDate)
-        _showDueDate = State(initialValue: true) // When initialized with a date, set showDueDate to true
+        // If the type requires premium access and user doesn't have access, default to note type
+        if initialEntryType.requiresPremium && !initialEntryType.hasAccess() {
+            self._selectedType = State(initialValue: .note)
+            self._showDueDate = State(initialValue: false)
+        } else {
+            self._selectedType = State(initialValue: initialEntryType)
+            self._showDueDate = State(initialValue: initialEntryType == .task)
+        }
         
-        // Save as last used type
-        UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
+        self._dueDate = State(initialValue: initialDate)
+        
+        // Save as last used type if accessible
+        if !initialEntryType.requiresPremium || initialEntryType.hasAccess() {
+            UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
+        }
     }
     
     var body: some View {
@@ -555,6 +613,17 @@ struct QuickAddView: View {
                     HStack(spacing: 8) {
                         ForEach(LogEntryType.allCases) { type in
                             Button(action: {
+                                // Check if this type requires premium access
+                                if type.requiresPremium && !type.hasAccess() {
+                                    // Notify parent view to show upgrade prompt
+                                    dismiss()
+                                    NotificationCenter.default.post(
+                                        name: NSNotification.Name("ShowUpgradePrompt"), 
+                                        object: type.rawValue
+                                    )
+                                    return
+                                }
+                                
                                 withAnimation(.easeInOut(duration: 0.2)) {
                                     selectedType = type
                                     lastUsedEntryType = Int(type.rawValue)
@@ -568,9 +637,21 @@ struct QuickAddView: View {
                                 }
                             }) {
                                 VStack(spacing: 8) {
-                                    Image(systemName: iconForType(type))
-                                        .font(.system(size: 20))
-                                        .foregroundColor(selectedType == type ? .white : .themeAccent)
+                                    ZStack {
+                                        Image(systemName: iconForType(type))
+                                            .font(.system(size: 20))
+                                            .foregroundColor(selectedType == type ? .white : .themeAccent)
+                                        
+                                        // Show lock icon overlay for premium features
+                                        if type.requiresPremium && !type.hasAccess() {
+                                            Image(systemName: "lock.fill")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(selectedType == type ? .white : .themeAccent)
+                                                .padding(2)
+                                                .background(Circle().fill(Color.white))
+                                                .offset(x: 10, y: 10)
+                                        }
+                                    }
                                     
                                     Text(type.displayName)
                                         .font(.subheadline)
@@ -583,6 +664,8 @@ struct QuickAddView: View {
                                     RoundedRectangle(cornerRadius: 12)
                                         .fill(selectedType == type ? Color.themeAccent : Color.themeAccent.opacity(0.05))
                                 )
+                                // Visual indication that premium features are locked
+                                .opacity(type.requiresPremium && !type.hasAccess() ? 0.7 : 1.0)
                             }
                         }
                     }

@@ -38,6 +38,10 @@ struct SettingsView: View {
     @State private var mailResult: Result<MFMailComposeResult, Error>? = nil
     @State private var showingDeleteConfirmation = false
     @State private var feedbackMessage: String = ""
+    @State private var couponCode: String = ""
+    @State private var showingCouponEntry: Bool = false
+    @State private var showingCouponSuccess: Bool = false
+    @State private var showingCouponError: Bool = false
     
     // Force view refresh
     @State private var refreshToggle = false
@@ -66,6 +70,9 @@ struct SettingsView: View {
                 VStack(spacing: 24) {
                     // Account section
                     accountSection
+                    
+                    // Subscription section
+                    subscriptionSection
                     
                     // Settings sections
                     appearanceSection
@@ -102,6 +109,16 @@ struct SettingsView: View {
             }
         } message: {
             Text("This will permanently delete all your tasks, notes, payments, and clients. This action cannot be undone.")
+        }
+        .alert("Success!", isPresented: $showingCouponSuccess) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("The coupon code has been applied successfully.")
+        }
+        .alert("Invalid Code", isPresented: $showingCouponError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("The coupon code you entered is not valid.")
         }
         .onAppear {
             tempUserName = userName
@@ -368,6 +385,161 @@ struct SettingsView: View {
                 }
                 .padding()
             }
+        }
+    }
+    
+    private var subscriptionSection: some View {
+        @ObservedObject var purchaseManager = PurchaseManager.shared
+        
+        return SettingsSectionView(title: "Subscription", icon: "star.circle.fill") {
+            VStack(spacing: 16) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(purchaseManager.isPro ? "Logbook One Pro" : "Logbook One Free")
+                            .font(.appHeadline)
+                            .foregroundColor(.themePrimary)
+                        
+                        if purchaseManager.isPro {
+                            Text(getSubscriptionLabel())
+                                .font(.appCaption)
+                                .foregroundColor(.themeSecondary)
+                        } else {
+                            Text("Upgrade to unlock all features")
+                                .font(.appCaption)
+                                .foregroundColor(.themeSecondary)
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    if purchaseManager.isPro {
+                        Text("Active")
+                            .font(.appCaption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4)
+                            .background(Color.themeSuccess)
+                            .cornerRadius(8)
+                    }
+                }
+                .padding()
+                
+                Divider()
+                
+                if !purchaseManager.isPro {
+                    NavigationLink(destination: UpgradeView()) {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.themeAccent)
+                            
+                            Text("Upgrade to Pro")
+                                .fontWeight(.semibold)
+                                .foregroundColor(.themeAccent)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.themeSecondary)
+                        }
+                        .padding()
+                    }
+                } else {
+                    Button(action: {
+                        // Handle subscription management
+                    }) {
+                        HStack {
+                            Image(systemName: "creditcard")
+                                .foregroundColor(.themeAccent)
+                            
+                            Text("Manage Subscription")
+                                .foregroundColor(.themePrimary)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.themeSecondary)
+                        }
+                        .padding()
+                    }
+                }
+                
+                // Toggle free/pro mode for testing (will only appear in debug builds)
+                #if DEBUG
+                Divider()
+                
+                Button(action: {
+                    if purchaseManager.isPro {
+                        // Reset to free mode
+                        purchaseManager.resetPurchaseState()
+                    } else {
+                        // Set to pro mode (simulate yearly purchase)
+                        purchaseManager.updateSubscription(type: .yearly)
+                    }
+                }) {
+                    HStack {
+                        Image(systemName: "testtube.2")
+                            .foregroundColor(.red)
+                        
+                        Text(purchaseManager.isPro ? "Reset to Free Mode" : "Enable Pro Mode")
+                            .foregroundColor(.red)
+                        
+                        Spacer()
+                    }
+                    .padding()
+                }
+                #endif
+                
+                // Coupon code entry
+                if !purchaseManager.isPro {
+                    Divider()
+                    
+                    if showingCouponEntry {
+                        VStack(spacing: 12) {
+                            HStack {
+                                TextField("Enter coupon code", text: $couponCode)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                                
+                                Button("Apply") {
+                                    applyCoupon()
+                                }
+                                .foregroundColor(.themeAccent)
+                            }
+                            
+                            Button("Cancel") {
+                                showingCouponEntry = false
+                                couponCode = ""
+                            }
+                            .foregroundColor(.themeSecondary)
+                            .font(.caption)
+                        }
+                        .padding()
+                    } else {
+                        Button(action: {
+                            showingCouponEntry = true
+                        }) {
+                            HStack {
+                                Image(systemName: "ticket")
+                                    .foregroundColor(.themeAccent)
+                                
+                                Text("Enter Coupon Code")
+                                    .foregroundColor(.themePrimary)
+                                
+                                Spacer()
+                            }
+                            .padding()
+                        }
+                    }
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.themeCard)
+            )
         }
     }
     
@@ -655,6 +827,32 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+    
+    // Helper function to apply coupon code
+    private func applyCoupon() {
+        let success = PurchaseManager.shared.applyCoupon(couponCode)
+        if success {
+            showingCouponSuccess = true
+            showingCouponEntry = false
+            couponCode = ""
+        } else {
+            showingCouponError = true
+        }
+    }
+    
+    // Helper to get subscription label
+    private func getSubscriptionLabel() -> String {
+        switch PurchaseManager.shared.subscriptionType {
+        case .monthly:
+            return "Monthly subscription"
+        case .yearly:
+            return "Annual subscription"
+        case .lifetime:
+            return "Lifetime purchase"
+        case .none:
+            return "Free version"
         }
     }
 }

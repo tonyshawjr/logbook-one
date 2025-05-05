@@ -7,11 +7,13 @@
 
 import SwiftUI
 import CoreData
+import UserNotifications
 
 @main
 struct LogbookOneApp: App {
     let persistenceController = PersistenceController.shared
     @StateObject private var nagManager = NagModeManager.shared
+    @StateObject private var purchaseManager = PurchaseManager.shared
     
     // App appearance settings
     @AppStorage("useDarkMode") private var useDarkMode = false
@@ -30,6 +32,9 @@ struct LogbookOneApp: App {
         
         // Listen for appearance refresh notifications
         setupAppearanceRefreshListener()
+        
+        // Register for URL handling for Gumroad/Stripe callbacks
+        setupURLHandling()
     }
 
     var body: some Scene {
@@ -61,6 +66,10 @@ struct LogbookOneApp: App {
                         .preferredColorScheme(colorScheme)
                 }
             }
+            .onOpenURL { url in
+                // Handle purchase callback URLs
+                handleIncomingURL(url)
+            }
         }
     }
     
@@ -91,6 +100,43 @@ struct LogbookOneApp: App {
                 }
             }
         }
+    }
+    
+    // Setup URL handling for payment callbacks
+    private func setupURLHandling() {
+        // Register for custom URL scheme handling
+        // Example: logbookone://purchase?success=true&type=monthly
+    }
+    
+    // Handle incoming URLs (called from SceneDelegate or via onOpenURL)
+    private func handleIncomingURL(_ url: URL) {
+        // Check if this is a purchase callback
+        if url.scheme == "logbookone" && url.host == "purchase" {
+            // Handle purchase verification via PurchaseManager
+            let success = purchaseManager.handlePurchaseCallback(url: url)
+            
+            // Show success/failure notification
+            if success {
+                // Show purchase success notification
+                showPurchaseSuccessNotification()
+            }
+        }
+    }
+    
+    // Show a purchase success notification
+    private func showPurchaseSuccessNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "Purchase Successful"
+        content.body = "Thank you for upgrading to Logbook One Pro!"
+        content.sound = UNNotificationSound.default
+        
+        let request = UNNotificationRequest(
+            identifier: "purchase-success",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+        
+        UNUserNotificationCenter.current().add(request)
     }
     
     // Determine the color scheme based on settings

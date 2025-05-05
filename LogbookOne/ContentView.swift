@@ -35,7 +35,7 @@ extension Notification.Name {
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
-    
+
     var body: some View {
         ZStack {
             if hasCompletedOnboarding {
@@ -56,6 +56,10 @@ struct MainTabView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.colorScheme) private var colorScheme
     @EnvironmentObject private var clientFormState: ClientFormState
+    
+    // For showing upgrade prompts
+    @State private var showingUpgradePrompt = false
+    @State private var upgradeFeature: ProFeature = .tasks
     
     // References to view state
     @State private var tasksViewShowingAdd = false
@@ -78,6 +82,10 @@ struct MainTabView: View {
                     TasksView()
                         .environment(\.managedObjectContext, viewContext)
                         .id(refreshID) // Force refresh when ID changes
+                        .requiresSubscription(
+                            for: .tasks,
+                            message: "Upgrade to Pro to access Tasks and all premium features!"
+                        )
                 }
                 .tabItem {
                     Label("Tasks", systemImage: "checkmark.circle")
@@ -91,13 +99,17 @@ struct MainTabView: View {
                 }
                 .tabItem {
                     Label("Notes", systemImage: "doc.text")
-                }
+                    }
                 .tag(2)
                 
                 NavigationStack {
                     PaymentsView()
                         .environment(\.managedObjectContext, viewContext)
                         .id(refreshID) // Force refresh when ID changes
+                        .requiresSubscription(
+                            for: .payments,
+                            message: "Upgrade to Pro to access Payments and all premium features!"
+                        )
                 }
                 .tabItem {
                     Label("Payments", systemImage: "dollarsign.circle")
@@ -109,6 +121,10 @@ struct MainTabView: View {
                         .environment(\.managedObjectContext, viewContext)
                         .environmentObject(clientFormState)
                         .id(refreshID) // Force refresh when ID changes
+                        .requiresSubscription(
+                            for: .clients,
+                            message: "Upgrade to Pro to access Client Management and all premium features!"
+                        )
                 }
                 .tabItem {
                     Label("Clients", systemImage: "person.3")
@@ -135,10 +151,31 @@ struct MainTabView: View {
                     // Generate a new ID to force view refresh
                     refreshID = UUID()
                 }
+                
+                // Set up notification observer for showing upgrade prompt
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("ShowUpgradePrompt"), object: nil, queue: .main) { notification in
+                    if let feature = notification.object as? ProFeature {
+                        upgradeFeature = feature
+                        showingUpgradePrompt = true
+                    } else if let typeRawValue = notification.object as? Int16 {
+                        // Convert the type raw value to the proper feature
+                        let entryType = LogEntryType(rawValue: typeRawValue) ?? .task
+                        switch entryType {
+                        case .task:
+                            upgradeFeature = .tasks
+                        case .payment:
+                            upgradeFeature = .payments
+                        case .note:
+                            return // Notes don't require premium
+                        }
+                        showingUpgradePrompt = true
+                    }
+                }
             }
             .onDisappear {
-                // Remove notification observer
+                // Remove notification observers
                 NotificationCenter.default.removeObserver(self, name: .refreshAfterQuickAdd, object: nil)
+                NotificationCenter.default.removeObserver(self, name: NSNotification.Name("ShowUpgradePrompt"), object: nil)
             }
             
             // Floating action button that only appears on certain tabs
@@ -154,26 +191,36 @@ struct MainTabView: View {
                         }
                         // Use more bottom padding and add extra for devices with home indicator
                         .padding(.bottom, UIDevice.current.hasHomeIndicator ? 100 : 85)
-                    }
-                }
             }
+        }
+    }
             .ignoresSafeArea(.all)
         }
         .sheet(isPresented: $showingQuickAdd) {
             Group {
                 switch selectedTab {
                 case 0: // Dashboard
-                    QuickAddView()
+                    // For Dashboard, only allow Notes in free mode, other types require Pro
+                    QuickAddView(initialEntryType: .note)
                         .onDisappear {
                             // Post notification to refresh views when sheet dismisses
                             NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
                         }
                 case 1: // Tasks
-                    QuickAddView(initialEntryType: .task)
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
+                    if PurchaseManager.shared.hasAccess(to: .tasks) {
+                        QuickAddView(initialEntryType: .task)
+                            .onDisappear {
+                                // Post notification to refresh views when sheet dismisses
+                                NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                            }
+                    } else {
+                        // Show upgrade prompt
+                        UpgradePromptView(
+                            isPresented: $showingQuickAdd,
+                            feature: .tasks,
+                            message: "Upgrade to Pro to access Tasks and all premium features!"
+                        )
+                    }
                 case 2: // Notes
                     QuickAddView(initialEntryType: .note)
                         .onDisappear {
@@ -181,14 +228,23 @@ struct MainTabView: View {
                             NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
                         }
                 case 3: // Payments
-                    QuickAddView(initialEntryType: .payment)
-                        .onDisappear {
-                            // Post notification to refresh views when sheet dismisses
-                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
-                        }
+                    if PurchaseManager.shared.hasAccess(to: .payments) {
+                        QuickAddView(initialEntryType: .payment)
+                            .onDisappear {
+                                // Post notification to refresh views when sheet dismisses
+                                NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                            }
+                    } else {
+                        // Show upgrade prompt
+                        UpgradePromptView(
+                            isPresented: $showingQuickAdd,
+                            feature: .payments,
+                            message: "Upgrade to Pro to access Payments and all premium features!"
+                        )
+                    }
                 default:
                     // Fallback for any other tab (though this shouldn't happen)
-                    QuickAddView()
+                    QuickAddView(initialEntryType: .note)
                         .onDisappear {
                             // Post notification to refresh views when sheet dismisses
                             NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
@@ -201,7 +257,7 @@ struct MainTabView: View {
             .presentationCornerRadius(24)
             .interactiveDismissDisabled(false)
             .environment(\.managedObjectContext, viewContext)
-        }
+            }
         // Global client form presentation
         .sheet(isPresented: $clientFormState.showingAddClient) {
             ClientFormView()
@@ -215,6 +271,32 @@ struct MainTabView: View {
                     // Post notification to refresh views when sheet dismisses
                     NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
                 }
+        }
+        // Upgrade prompt sheet
+        .sheet(isPresented: $showingUpgradePrompt) {
+            UpgradePromptView(
+                isPresented: $showingUpgradePrompt,
+                feature: upgradeFeature,
+                message: "Upgrade to Pro to access \(getFeatureTitle(upgradeFeature)) and all premium features!"
+            )
+        }
+    }
+
+    // Helper method to get the feature title based on ProFeature
+    private func getFeatureTitle(_ feature: ProFeature) -> String {
+        switch feature {
+        case .tasks:
+            return "Tasks Management"
+        case .payments:
+            return "Payments Tracking"
+        case .clients:
+            return "Client Management"
+        case .nagMode:
+            return "Nag Mode"
+        case .export:
+            return "Data Export"
+        case .dataImport:
+            return "Data Import"
         }
     }
 }

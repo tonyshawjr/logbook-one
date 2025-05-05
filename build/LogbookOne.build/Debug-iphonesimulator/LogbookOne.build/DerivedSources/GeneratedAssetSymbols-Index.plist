@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>colors</key>
+	<array>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameAppAccent</string>
+			<key>relativePath</key>
+			<string>./appAccent.colorset</string>
+			<key>swiftSymbol</key>
+			<string>appAccent</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameAppBackground</string>
+			<key>relativePath</key>
+			<string>./appBackground.colorset</string>
+			<key>swiftSymbol</key>
+			<string>appBackground</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameCardBackground</string>
+			<key>relativePath</key>
+			<string>./cardBackground.colorset</string>
+			<key>swiftSymbol</key>
+			<string>cardBackground</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameDanger</string>
+			<key>relativePath</key>
+			<string>./danger.colorset</string>
+			<key>swiftSymbol</key>
+			<string>danger</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameNoteColor</string>
+			<key>relativePath</key>
+			<string>./noteColor.colorset</string>
+			<key>swiftSymbol</key>
+			<string>note</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNamePaymentColor</string>
+			<key>relativePath</key>
+			<string>./paymentColor.colorset</string>
+			<key>swiftSymbol</key>
+			<string>payment</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNamePrimaryText</string>
+			<key>relativePath</key>
+			<string>./primaryText.colorset</string>
+			<key>swiftSymbol</key>
+			<string>primaryText</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameSecondaryText</string>
+			<key>relativePath</key>
+			<string>./secondaryText.colorset</string>
+			<key>swiftSymbol</key>
+			<string>secondaryText</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameSuccess</string>
+			<key>relativePath</key>
+			<string>./success.colorset</string>
+			<key>swiftSymbol</key>
+			<string>success</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameTaskColor</string>
+			<key>relativePath</key>
+			<string>./taskColor.colorset</string>
+			<key>swiftSymbol</key>
+			<string>task</string>
+		</dict>
+		<dict>
+			<key>catalogPath</key>
+			<string>/Users/tonyshaw/Documents/Little Big Planet/Logbook One/LogbookOne/LogbookOne/Assets.xcassets</string>
+			<key>objcSymbol</key>
+			<string>ACColorNameWarning</string>
+			<key>relativePath</key>
+			<string>./warning.colorset</string>
+			<key>swiftSymbol</key>
+			<string>warning</string>
+		</dict>
+	</array>
+	<key>images</key>
+	<array/>
+	<key>symbols</key>
+	<array/>
+</dict>
+</plist>

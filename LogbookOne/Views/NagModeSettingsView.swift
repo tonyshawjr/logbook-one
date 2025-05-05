@@ -13,6 +13,9 @@ struct NagModeSettingsView: View {
     @State private var showingTonePreview = false
     @State private var tempBuddyName = ""
     @State private var isEditingBuddyName = false
+    @State private var showingUpgradePrompt = false
+    
+    @ObservedObject private var purchaseManager = PurchaseManager.shared
     
     // Sample messages for each tone to preview
     private let previewMessages = [
@@ -49,33 +52,90 @@ struct NagModeSettingsView: View {
             ZStack {
                 Color.themeBackground.ignoresSafeArea()
                 
-                ScrollView {
-                    VStack(spacing: 24) {
-                        // Logo section
+                if purchaseManager.hasAccess(to: .nagMode) {
+                    // Full Nag Mode settings
+                    ScrollView {
+                        VStack(spacing: 24) {
+                            // Logo section
+                            nagModeLogo
+                                .padding(.top, 20)
+                            
+                            // Master toggle
+                            nagModeToggle
+                            
+                            if nagModeEnabled {
+                                // Settings sections
+                                Group {
+                                    cutoffTimeSection
+                                    intensitySection
+                                    toneSection
+                                    inAppNagsSection
+                                    buddyModeSection
+                                    nagJournalSection
+                                }
+                                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 40)
+                        .animation(.easeInOut, value: nagModeEnabled)
+                    }
+                } else {
+                    // Locked view with upgrade prompt
+                    VStack(spacing: 20) {
                         nagModeLogo
                             .padding(.top, 20)
                         
-                        // Master toggle
-                        nagModeToggle
+                        Spacer()
                         
-                        if nagModeEnabled {
-                            // Settings sections
-                            Group {
-                                cutoffTimeSection
-                                intensitySection
-                                toneSection
-                                inAppNagsSection
-                                buddyModeSection
-                                nagJournalSection
+                        VStack(spacing: 16) {
+                            Image(systemName: "lock.fill")
+                                .font(.system(size: 50))
+                                .foregroundColor(.themeSecondary)
+                            
+                            Text("Nag Mode is a Pro Feature")
+                                .font(.appTitle2)
+                                .foregroundColor(.themePrimary)
+                                .multilineTextAlignment(.center)
+                            
+                            Text("Upgrade to Logbook One Pro to unlock Nag Mode and keep yourself accountable.")
+                                .font(.appBody)
+                                .foregroundColor(.themeSecondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                            
+                            Button(action: {
+                                showingUpgradePrompt = true
+                            }) {
+                                Text("Upgrade to Pro")
+                                    .font(.appHeadline)
+                                    .foregroundColor(.white)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.themeAccent)
+                                    .cornerRadius(12)
+                                    .padding(.horizontal, 32)
                             }
-                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                            .padding(.top, 8)
                         }
                         
                         Spacer()
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom, 40)
-                    .animation(.easeInOut, value: nagModeEnabled)
+                }
+                
+                // Upgrade prompt overlay
+                if showingUpgradePrompt {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .overlay(
+                            UpgradePromptView(
+                                isPresented: $showingUpgradePrompt,
+                                feature: .nagMode,
+                                message: "Upgrade to Pro to use Nag Mode and stay accountable!"
+                            )
+                        )
                 }
             }
             .navigationTitle("Nag Mode")
@@ -97,6 +157,19 @@ struct NagModeSettingsView: View {
         }
         .onAppear {
             tempBuddyName = nagModeBuddyName
+            
+            // Check if toggle is enabled while not having Pro access
+            if nagModeEnabled && !purchaseManager.hasAccess(to: .nagMode) {
+                // Disable the toggle
+                nagModeEnabled = false
+            }
+        }
+        .onChange(of: nagModeEnabled) { _, newValue in
+            // If user tries to enable while not having pro access
+            if newValue && !purchaseManager.hasAccess(to: .nagMode) {
+                nagModeEnabled = false // Reset toggle
+                showingUpgradePrompt = true // Show upgrade prompt
+            }
         }
         .sheet(isPresented: $showingTonePreview) {
             nagModePreviewSheet
