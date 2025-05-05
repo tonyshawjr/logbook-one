@@ -153,6 +153,9 @@ struct SettingsView: View {
             // Update sample data state
             useSampleData = false
             
+            // Reset onboarding flag so it will show again
+            UserDefaults.standard.set(false, forKey: "hasCompletedOnboarding")
+            
             // Add haptic feedback for confirmation
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
