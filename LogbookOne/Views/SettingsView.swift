@@ -70,6 +70,7 @@ struct SettingsView: View {
                     // Settings sections
                     appearanceSection
                     preferencesSection
+                    nagModeSection
                     dataSection
                     supportSection
                     legalSection
@@ -412,21 +413,6 @@ struct SettingsView: View {
         }
     }
     
-    // Apply appearance changes immediately to all app windows
-    private func applyAppearanceChange() {
-        for scene in UIApplication.shared.connectedScenes {
-            if let windowScene = scene as? UIWindowScene {
-                for window in windowScene.windows {
-                    if useSystemAppearance {
-                        window.overrideUserInterfaceStyle = .unspecified
-                    } else {
-                        window.overrideUserInterfaceStyle = useDarkMode ? .dark : .light
-                    }
-                }
-            }
-        }
-    }
-    
     private var preferencesSection: some View {
         SettingsSectionView(title: "Preferences", icon: "gear") {
             VStack(alignment: .leading, spacing: 16) {
@@ -467,6 +453,52 @@ struct SettingsView: View {
                 
                 // Task preferences
                 Toggle("Automatically Hide Completed Tasks", isOn: $autoHideCompletedTasks)
+            }
+            .padding()
+        }
+    }
+    
+    // Nag Mode section
+    private var nagModeSection: some View {
+        SettingsSectionView(title: "Accountability", icon: "bell.badge.fill") {
+            VStack(spacing: 16) {
+                NavigationLink(destination: NagModeSettingsView()) {
+                    HStack {
+                        // NAG MODE text with simple Impact style
+                        Text("NAG MODE")
+                            .font(.system(size: 18, weight: .black, design: .default))
+                            .foregroundColor(.red)
+                            .kerning(1)
+                            .tracking(0.5)
+                        
+                        Spacer()
+                        
+                        // Status & chevron
+                        HStack {
+                            if UserDefaults.standard.bool(forKey: "nagModeEnabled") {
+                                Text("On")
+                                    .font(.appSubheadline)
+                                    .foregroundColor(.themeSuccess)
+                            } else {
+                                Text("Off")
+                                    .font(.appSubheadline)
+                                    .foregroundColor(.themeSecondary)
+                            }
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundColor(Color.themeSecondary.opacity(0.5))
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                
+                if UserDefaults.standard.bool(forKey: "nagModeEnabled") && 
+                   UserDefaults.standard.bool(forKey: "nagModeShowJournal") {
+                    NavigationLink(destination: NagModeJournalView()) {
+                        SettingsRowView(title: "View Nag Journal", icon: "calendar.badge.clock", iconColor: .themeAccent)
+                    }
+                }
             }
             .padding()
         }
@@ -607,6 +639,21 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
+            }
+        }
+    }
+    
+    // Apply appearance changes immediately to all app windows
+    private func applyAppearanceChange() {
+        for scene in UIApplication.shared.connectedScenes {
+            if let windowScene = scene as? UIWindowScene {
+                for window in windowScene.windows {
+                    if useSystemAppearance {
+                        window.overrideUserInterfaceStyle = .unspecified
+                    } else {
+                        window.overrideUserInterfaceStyle = useDarkMode ? .dark : .light
+                    }
+                }
             }
         }
     }

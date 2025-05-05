@@ -11,10 +11,12 @@ import CoreData
 @main
 struct LogbookOneApp: App {
     let persistenceController = PersistenceController.shared
+    @StateObject private var nagManager = NagModeManager.shared
     
     // App appearance settings
     @AppStorage("useDarkMode") private var useDarkMode = false
     @AppStorage("useSystemAppearance") private var useSystemAppearance = true
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = true
     
     // Create a shared ClientFormState instance
     @StateObject private var clientFormState = ClientFormState()
@@ -32,14 +34,33 @@ struct LogbookOneApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                .preferredColorScheme(colorScheme)
-                .environmentObject(clientFormState)
-                .onAppear {
-                    // Force UI update when app appears to apply any appearance changes
-                    configureAppearance()
+            ZStack {
+                if hasCompletedOnboarding {
+                    ContentView()
+                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                        .preferredColorScheme(colorScheme)
+                        .environmentObject(clientFormState)
+                        .onAppear {
+                            // Force UI update when app appears to apply any appearance changes
+                            configureAppearance()
+                            
+                            // Check if Nag Mode should activate
+                            nagManager.checkAndScheduleNags(in: persistenceController.container.viewContext)
+                        }
+                        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                            // Check nag status whenever app becomes active
+                            nagManager.checkAndScheduleNags(in: persistenceController.container.viewContext)
+                        }
+                        .overlay(alignment: .top) {
+                            NagModeBanner()
+                                .animation(.spring(), value: nagManager.showInAppNag)
+                        }
+                } else {
+                    OnboardingView(hasCompletedOnboarding: $hasCompletedOnboarding)
+                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                        .preferredColorScheme(colorScheme)
                 }
+            }
         }
     }
     
@@ -121,50 +142,6 @@ struct LogbookOneApp: App {
         UITableView.appearance().backgroundColor = UIColor(named: "themeBackground")
         UITableViewCell.appearance().backgroundColor = UIColor(named: "themeCard")
     }
-    
-    /// Adjust tab bar item spacing after the app has launched
-    /* 
-    private func adjustTabBarItemSpacing() {
-        DispatchQueue.main.async {
-            // Find all tab bars in the app using scenes API
-            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-               let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                self.findAndAdjustTabBars(in: keyWindow)
-            }
-        }
-    }
-    
-    private func findAndAdjustTabBars(in view: UIView) {
-        // Check if this view is a tab bar
-        if let tabBar = view as? UITabBar {
-            // Add top inset to tab bar items
-            tabBar.items?.forEach { item in
-                // Reduce the excessive top padding while keeping improved touch targets
-                item.titlePositionAdjustment = UIOffset(horizontal: 0, vertical: 2)
-                item.imageInsets = UIEdgeInsets(top: 4, left: 0, bottom: 0, right: 0)
-            }
-        }
-        
-        // Recursive search through view hierarchy
-        for subview in view.subviews {
-            findAndAdjustTabBars(in: subview)
-        }
-    }
-    
-    private func findTabBar(in view: UIView) -> UITabBar? {
-        if let tabBar = view as? UITabBar {
-            return tabBar
-        }
-        
-        for subview in view.subviews {
-            if let tabBar = findTabBar(in: subview) {
-                return tabBar
-            }
-        }
-        
-        return nil
-    }
-    */
     
     /// Updates existing log entries that don't have a creation date
     private func updateExistingEntriesWithMissingCreationDate() {
