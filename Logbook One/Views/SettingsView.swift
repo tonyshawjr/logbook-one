@@ -746,11 +746,28 @@ struct MailView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> MFMailComposeViewController {
         let viewController = MFMailComposeViewController()
         viewController.mailComposeDelegate = context.coordinator
-        viewController.setToRecipients(["support@example.com"])
+        
+        // Determine the appropriate recipient based on subject
+        let recipient: String
+        if subject.contains("Bug Report") {
+            recipient = "bug@logbookone.app"
+        } else if subject.contains("Feature Request") {
+            recipient = "featurerequest@logbookone.app"
+        } else {
+            recipient = "support@logbookone.app"
+        }
+        
+        viewController.setToRecipients([recipient])
         viewController.setSubject(subject)
         
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let deviceModel = UIDevice.current.model
+        let systemVersion = UIDevice.current.systemVersion
+        
         let message = """
-            App Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown")
+            App Version: \(appVersion)
+            Device: \(deviceModel)
+            iOS Version: \(systemVersion)
             
             Please describe your request or issue:
             
@@ -851,39 +868,72 @@ struct FeedbackFormView: View {
     let feedbackType: FeedbackType
     @State private var email: String = ""
     @State private var message: String = ""
-    @State private var isSending = false
-    @State private var showingSuccessAlert = false
-    @State private var showingErrorAlert = false
+    @State private var bugDetails: String = ""
+    @State private var featureCategory: String = "Workflow"
+    @State private var featurePriority: String = "Medium"
+    @State private var supportCategory: String = "General"
+    @State private var deviceInfo: String = ""
+    
+    // Get device info for bug reports
+    private let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    private let deviceModel = UIDevice.current.model
+    private let systemVersion = UIDevice.current.systemVersion
     
     var body: some View {
         NavigationStack {
             Form {
+                // Form header with icon
+                Section {
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 12) {
+                            // Icon based on feedback type
+                            Image(systemName: iconName)
+                                .font(.system(size: 48))
+                                .foregroundColor(iconColor)
+                                .padding(.top, 10)
+                            
+                            // Title
+                            Text(feedbackType.rawValue)
+                                .font(.headline)
+                                .foregroundColor(.themePrimary)
+                        }
+                        Spacer()
+                    }
+                }
+                .listRowBackground(Color.clear)
+                
                 Section(header: Text("Contact Information")) {
                     TextField("Your Email", text: $email)
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
+                        .onAppear {
+                            // Auto-populate device info for bug reports
+                            deviceInfo = "App Version: \(appVersion)\nDevice: \(deviceModel)\niOS Version: \(systemVersion)"
+                        }
                 }
                 
-                Section(header: Text(getMessageHeader())) {
-                    TextEditor(text: $message)
-                        .frame(minHeight: 150)
+                // Different sections based on feedback type
+                switch feedbackType {
+                case .support:
+                    supportFormSections
+                case .feature:
+                    featureRequestSections
+                case .bug:
+                    bugReportSections
                 }
                 
                 Section {
                     Button(action: sendFeedback) {
                         HStack {
                             Spacer()
-                            if isSending {
-                                ProgressView()
-                                    .padding(.trailing, 10)
-                            }
-                            Text("Submit")
+                            Text("Send Email")
                                 .font(.headline)
                             Spacer()
                         }
                     }
-                    .disabled(email.isEmpty || message.isEmpty || isSending)
+                    .disabled(email.isEmpty || message.isEmpty)
                 }
             }
             .navigationTitle(feedbackType.rawValue)
@@ -895,59 +945,183 @@ struct FeedbackFormView: View {
                     }
                 }
             }
-            .alert("Thank You", isPresented: $showingSuccessAlert) {
-                Button("OK") {
-                    presentationMode.wrappedValue.dismiss()
+        }
+    }
+    
+    // Icon name based on feedback type
+    private var iconName: String {
+        switch feedbackType {
+        case .support:
+            return "questionmark.circle"
+        case .feature:
+            return "lightbulb"
+        case .bug:
+            return "ladybug"
+        }
+    }
+    
+    // Icon color based on feedback type
+    private var iconColor: Color {
+        switch feedbackType {
+        case .support:
+            return .themeAccent
+        case .feature:
+            return .themeWarning 
+        case .bug:
+            return .themeDanger
+        }
+    }
+    
+    // Support form specific sections
+    private var supportFormSections: some View {
+        Group {
+            Section(header: Text("What do you need help with?")) {
+                Picker("Category", selection: $supportCategory) {
+                    Text("General").tag("General")
+                    Text("Account").tag("Account")
+                    Text("Payments").tag("Payments")
+                    Text("Tasks").tag("Tasks")
+                    Text("Notes").tag("Notes")
+                    Text("Clients").tag("Clients")
+                    Text("Other").tag("Other")
                 }
-            } message: {
-                Text("Your \(feedbackType.rawValue.lowercased()) has been submitted successfully.")
+                .pickerStyle(.menu)
             }
-            .alert("Error", isPresented: $showingErrorAlert) {
-                Button("Try Again", role: .cancel) { }
-                Button("Send Email Instead") {
-                    sendViaEmail()
-                }
-            } message: {
-                Text("There was a problem submitting your feedback. Please try again or use email instead.")
+            
+            Section(header: Text("Details")) {
+                TextEditor(text: $message)
+                    .frame(minHeight: 150)
             }
         }
     }
     
-    private func getMessageHeader() -> String {
-        switch feedbackType {
-        case .support:
-            return "How can we help you?"
-        case .feature:
-            return "Describe the feature you'd like to see"
-        case .bug:
-            return "Describe the issue you're experiencing"
+    // Feature request specific sections
+    private var featureRequestSections: some View {
+        Group {
+            Section(header: Text("Feature Details")) {
+                Picker("Category", selection: $featureCategory) {
+                    Text("Workflow").tag("Workflow")
+                    Text("UI/UX").tag("UI/UX")
+                    Text("Tasks").tag("Tasks")
+                    Text("Notes").tag("Notes")
+                    Text("Payments").tag("Payments")
+                    Text("Clients").tag("Clients")
+                    Text("Reports").tag("Reports")
+                    Text("Other").tag("Other")
+                }
+                .pickerStyle(.menu)
+                
+                Picker("Priority", selection: $featurePriority) {
+                    Text("Nice to have").tag("Low")
+                    Text("Would improve my workflow").tag("Medium")
+                    Text("Would significantly help me").tag("High")
+                    Text("This is a must-have").tag("Critical")
+                }
+                .pickerStyle(.menu)
+            }
+            
+            Section(header: Text("Feature Description")) {
+                TextEditor(text: $message)
+                    .frame(minHeight: 150)
+                    .placeholder(when: message.isEmpty) {
+                        Text("Describe the feature you'd like to see and how it would help you")
+                            .foregroundColor(.gray)
+                            .padding(.leading, 4)
+                    }
+            }
+        }
+    }
+    
+    // Bug report specific sections
+    private var bugReportSections: some View {
+        Group {
+            Section(header: Text("Bug Details")) {
+                TextEditor(text: $message)
+                    .frame(minHeight: 150)
+                    .placeholder(when: message.isEmpty) {
+                        Text("Describe what happened and what you expected to happen")
+                            .foregroundColor(.gray)
+                            .padding(.leading, 4)
+                    }
+            }
+            
+            Section(header: Text("Steps to Reproduce")) {
+                TextEditor(text: $bugDetails)
+                    .frame(minHeight: 100)
+                    .placeholder(when: bugDetails.isEmpty) {
+                        Text("List the steps to reproduce this issue")
+                            .foregroundColor(.gray)
+                            .padding(.leading, 4)
+                    }
+            }
+            
+            Section(header: Text("Device Information")) {
+                Text(deviceInfo)
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
         }
     }
     
     private func sendFeedback() {
-        isSending = true
+        var emailAddress: String
+        var subject: String
+        var body: String
         
-        // Simulate network request
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isSending = false
+        // Configure email content based on feedback type
+        switch feedbackType {
+        case .support:
+            emailAddress = "support@logbookone.app"
+            subject = "Logbook One Support: \(supportCategory)"
+            body = """
+            Support Request
+            Category: \(supportCategory)
             
-            // In a real app, this would send data to your backend
-            if Bool.random() { // Simulate success/failure for demo
-                showingSuccessAlert = true
-            } else {
-                showingErrorAlert = true
-            }
+            Details:
+            \(message)
+            
+            App Version: \(appVersion)
+            """
+            
+        case .feature:
+            emailAddress = "featurerequest@logbookone.app"
+            subject = "Logbook One Feature Request: \(featureCategory)"
+            body = """
+            Feature Request
+            Category: \(featureCategory)
+            Priority: \(featurePriority)
+            
+            Feature Description:
+            \(message)
+            
+            App Version: \(appVersion)
+            """
+            
+        case .bug:
+            emailAddress = "bug@logbookone.app"
+            subject = "Logbook One Bug Report"
+            body = """
+            Bug Report
+            
+            Issue Description:
+            \(message)
+            
+            Steps to Reproduce:
+            \(bugDetails)
+            
+            Device Information:
+            \(deviceInfo)
+            """
         }
-    }
-    
-    private func sendViaEmail() {
-        let subject = URLQueryItem(name: "subject", value: feedbackType.rawValue)
-        let body = URLQueryItem(name: "body", value: message)
+        
+        // Construct the mailto URL
+        let subjectItem = URLQueryItem(name: "subject", value: subject)
+        let bodyItem = URLQueryItem(name: "body", value: body)
         
         var components = URLComponents()
         components.scheme = "mailto"
-        components.path = "support@example.com"
-        components.queryItems = [subject, body]
+        components.path = emailAddress
+        components.queryItems = [subjectItem, bodyItem]
         
         if let url = components.url {
             openURL(url)
