@@ -175,7 +175,7 @@ struct TasksView: View {
                 forceUpdate.toggle()
             }
             .id(forceUpdate) // Force view to update when this changes
-            .navigationBarTitleDisplayMode(.inline) // Change to inline to completely hide the title
+            .navigationBarTitleDisplayMode(.inline) // Hide the navigation bar title
             .toolbar(.hidden, for: .navigationBar) // Hide the navigation bar completely
             .toolbarBackground(Color.themeBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
@@ -579,7 +579,7 @@ struct TaskCardView: View {
     }
     
     private func createCompletionEntry() {
-        // Create a new log entry for the completed task to show in Today's Activity
+        // Create a new log entry for the completed task to show in Today's Wins
         let completionEntry = LogEntry(context: viewContext)
         completionEntry.id = UUID()
         completionEntry.type = LogEntryType.task.rawValue
@@ -718,7 +718,7 @@ struct UnscheduledTaskCardView: View {
     }
     
     private func createCompletionEntry() {
-        // Create a new log entry for the completed task to show in Today's Activity
+        // Create a new log entry for the completed task to show in Today's Wins
         let completionEntry = LogEntry(context: viewContext)
         completionEntry.id = UUID()
         completionEntry.type = LogEntryType.task.rawValue

@@ -479,6 +479,10 @@ struct SettingsView: View {
                     SettingsRowView(title: "Export Data", icon: "square.and.arrow.up", iconColor: .themeAccent)
                 }
                 
+                NavigationLink(destination: ImportView()) {
+                    SettingsRowView(title: "Import Data", icon: "square.and.arrow.down", iconColor: .themeAccent)
+                }
+                
                 Button(action: {
                     showingDeleteConfirmation = true
                 }) {
