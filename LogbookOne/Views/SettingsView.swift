@@ -408,6 +408,17 @@ struct SettingsView: View {
                             NotificationCenter.default.post(name: NSNotification.Name("RefreshAppearance"), object: nil)
                         }
                 }
+                
+                NavigationLink(destination: ThemeColorDebugView()) {
+                    HStack {
+                        Text("View Theme Colors")
+                        
+                        Spacer()
+                        
+                        Image(systemName: "circle.hexagongrid.fill")
+                            .foregroundColor(.themeAccent)
+                    }
+                }
             }
             .padding()
         }

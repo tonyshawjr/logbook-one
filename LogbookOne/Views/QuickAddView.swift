@@ -464,6 +464,7 @@ struct CalendarGridView: View {
 struct QuickAddView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
     
     @AppStorage("lastUsedEntryType") private var lastUsedEntryType = 0
     @State private var selectedType: LogEntryType
@@ -562,10 +563,8 @@ struct QuickAddView: View {
                                     // Update the prompt when changing type
                                     currentPrompt = getRandomPrompt(for: type)
                                 }
-                                // Focus after animation completes
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                                    isDescriptionFocused = true
-                                }
+                                // Don't auto-focus after animation completes
+                                // Let the user tap when they want to type
                             }) {
                                 VStack(spacing: 8) {
                                     Image(systemName: iconForType(type))
@@ -791,10 +790,8 @@ struct QuickAddView: View {
             // Select a random prompt when view appears
             currentPrompt = getRandomPrompt(for: selectedType)
             
-            // Auto-focus the description field
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                isDescriptionFocused = true
-            }
+            // Don't auto-focus the description field - wait for user to tap
+            // This prevents the keyboard from appearing automatically
             
             // Don't automatically set showDueDate to true for tasks
             // Let it respect the initialized value

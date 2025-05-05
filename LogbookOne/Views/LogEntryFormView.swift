@@ -4,6 +4,7 @@ import CoreData
 struct LogEntryFormView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.theme) private var theme
     
     @State private var selectedType: LogEntryType
     @State private var description: String = ""
@@ -87,7 +88,7 @@ struct LogEntryFormView: View {
                     VStack {
                         ZStack {
                             Circle()
-                                .fill(Color.green)
+                                .fill(theme.success)
                                 .frame(width: 80, height: 80)
                                 .shadow(radius: 5)
                             

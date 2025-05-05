@@ -8,6 +8,7 @@ struct QuickActionButton: View {
     @Binding var showingSheet: Bool
     var currentTab: Int
     @ObservedObject private var nagManager = NagModeManager.shared
+    @Environment(\.theme) private var theme
     
     var body: some View {
         // Only render actual content if we're on an allowed tab
@@ -35,14 +36,17 @@ struct QuickActionButton: View {
                             .frame(width: 60, height: 60)
                             .background(
                                 Circle()
-                                    .fill(Color.themeAccent)
-                                    .shadow(color: Color.themeAccent.opacity(0.3), radius: 5, x: 0, y: 3)
+                                    .fill(theme.accent)
+                                    .shadow(color: theme.accent.opacity(0.3), radius: 5, x: 0, y: 3)
                             )
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .nagModePulse() // Apply the pulsing effect when Nag Mode is active
                     .padding(.trailing, 20)
+                    .padding(.bottom, 20) // Add bottom padding to raise the button
                 }
+                // Add more space between the button and the tab bar
+                .padding(.bottom, UIDevice.current.hasHomeIndicator ? 90 : 75)
             }
             .background(Color.clear)
         } else {

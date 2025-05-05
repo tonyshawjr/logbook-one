@@ -93,6 +93,7 @@ struct DashboardView: View {
     @State private var showingAddEntry = false
     @State private var showingAddClient = false
     @State private var activitySortAscending = false
+    @State private var refreshID = UUID() // State for forcing view updates
     
     // User name from settings
     @AppStorage("userName") private var userName: String = ""
@@ -216,6 +217,7 @@ struct DashboardView: View {
                 }
             }
             .padding(.vertical)
+            .id(refreshID) // Force refresh when ID changes
         }
         .background(Color.themeBackground)
         .navigationBarTitleDisplayMode(.inline)
@@ -227,6 +229,12 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showingAddClient) {
             ClientFormView()
+        }
+        .onAppear {
+            setUpNotifications()
+        }
+        .onDisappear {
+            tearDownNotifications()
         }
     }
     
@@ -357,16 +365,17 @@ struct DashboardView: View {
             HStack {
                 Label("What to Tackle", systemImage: "checkmark.circle")
                     .font(.appHeadline)
-                    .foregroundColor(.themePrimary)
+                    .foregroundStyle(Color.themePrimary)
                 
                 Spacer()
                 
                 NavigationLink(destination: TasksView()) {
                     Text("View All")
                         .font(.appCaption.weight(.medium))
-                        .foregroundColor(.themeAccent)
+                        .foregroundStyle(Color.themeAccent)
                 }
             }
+            .id(refreshID)
             
             Divider()
             
@@ -376,7 +385,7 @@ struct DashboardView: View {
                     HStack {
                         Text("No tasks for today")
                             .font(.appBody)
-                            .foregroundColor(.themeSecondary)
+                            .foregroundStyle(Color.themeSecondary)
                             .padding(.vertical, 8)
                         
                         Spacer()
@@ -385,7 +394,7 @@ struct DashboardView: View {
                     // Show overdue tasks first
                     ForEach(overdueTasks) { task in
                         NavigationLink(destination: EntryDetailView(entry: task)) {
-                            MinimalTaskRowView(task: task, isOverdue: true)
+                            MinimalTaskRowView(task: task, isOverdue: true, refreshID: refreshID)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -393,7 +402,7 @@ struct DashboardView: View {
                     // Today's tasks
                     ForEach(tasksForToday) { task in
                         NavigationLink(destination: EntryDetailView(entry: task)) {
-                            MinimalTaskRowView(task: task)
+                            MinimalTaskRowView(task: task, refreshID: refreshID)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -406,13 +415,13 @@ struct DashboardView: View {
                     
                     Text("Unscheduled")
                         .font(.appSubheadline)
-                        .foregroundColor(.themeSecondary)
+                        .foregroundStyle(Color.themeSecondary)
                         .padding(.top, 4)
                     
                     let tasksToShow = undatedTasks.prefix(3)
                     ForEach(Array(tasksToShow)) { task in
                         NavigationLink(destination: EntryDetailView(entry: task)) {
-                            MinimalTaskRowView(task: task)
+                            MinimalTaskRowView(task: task, refreshID: refreshID)
                         }
                         .buttonStyle(PlainButtonStyle())
                     }
@@ -420,11 +429,12 @@ struct DashboardView: View {
                     if undatedTasks.count > 3 {
                         Text("+ \(undatedTasks.count - 3) more")
                             .font(.caption)
-                            .foregroundColor(.themeSecondary)
+                            .foregroundStyle(Color.themeSecondary)
                             .padding(.top, 4)
                     }
                 }
             }
+            .id(refreshID)
         }
         .padding()
         .background(Color.themeCard)
@@ -437,6 +447,7 @@ struct DashboardView: View {
     private struct MinimalTaskRowView: View {
         let task: LogEntry
         var isOverdue: Bool = false
+        var refreshID: UUID = UUID() // Default value for backward compatibility
         @Environment(\.managedObjectContext) private var viewContext
         
         var body: some View {
@@ -447,19 +458,21 @@ struct DashboardView: View {
                 } label: {
                     Image(systemName: task.isComplete ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20))
-                        .foregroundColor(task.isComplete ? .themeTask : (isOverdue ? .red : .themeSecondary))
+                        .foregroundStyle(task.isComplete ? Color.themeTask : (isOverdue ? Color.red : Color.themeSecondary))
                 }
                 .buttonStyle(BorderlessButtonStyle())
+                .id(refreshID) // Force refresh when refreshID changes
                 
                 // Just the task description
                 Text(task.desc ?? "Untitled Task")
                     .font(.appSubheadline)
-                    .foregroundColor(isOverdue ? .red : .themePrimary)
+                    .foregroundStyle(isOverdue ? Color.red : Color.themePrimary)
                     .lineLimit(1)
                     .strikethrough(task.isComplete)
                 
                 Spacer()
             }
+            .id(refreshID) // Force refresh when refreshID changes
             .contentShape(Rectangle())
             .padding(.vertical, 4)
         }
@@ -584,6 +597,32 @@ struct DashboardView: View {
         formatter.maximumFractionDigits = 2
         formatter.minimumFractionDigits = 2
         return formatter.string(from: NSNumber(value: value)) ?? "$0.00"
+    }
+    
+    // Set up notification observers for theme changes
+    private func setUpNotifications() {
+        // Listen for theme changes
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ThemeColorChange"),
+            object: nil,
+            queue: .main
+        ) { _ in
+            // Force refresh with a slight delay to ensure theme changes are processed
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                withAnimation(.linear(duration: 0.01)) {
+                    self.refreshID = UUID()
+                }
+            }
+        }
+    }
+    
+    // Remove notification observers when view disappears
+    private func tearDownNotifications() {
+        NotificationCenter.default.removeObserver(
+            self,
+            name: NSNotification.Name("ThemeColorChange"),
+            object: nil
+        )
     }
 }
 

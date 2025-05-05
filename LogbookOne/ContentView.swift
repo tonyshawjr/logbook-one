@@ -118,6 +118,29 @@ struct MainTabView: View {
             .tint(Color.themeAccent)
             .environment(\.managedObjectContext, viewContext)
             .environmentObject(clientFormState)
+            .onChange(of: colorScheme) { oldValue, newValue in
+                // Update CurrentTheme when the color scheme changes
+                let _ = CurrentTheme.shared.getCurrentTheme(isDark: newValue == .dark)
+                
+                // Force refresh the entire view
+                refreshID = UUID()
+                
+                // Use the force reset method to completely refresh the tab bar
+                self.forceTabBarReset()
+                
+                // Also update tab bars recursively as a backup
+                if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                   let rootViewController = window.rootViewController {
+                    self.updateTabBarsRecursively(in: rootViewController)
+                }
+                
+                // Schedule an additional update after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    self.forceTabBarReset()
+                    refreshID = UUID() // Force another refresh
+                }
+            }
             .onChange(of: selectedTab) { oldValue, newValue in
                 // Request layout update with a simple approach
                 DispatchQueue.main.async {
@@ -130,15 +153,46 @@ struct MainTabView: View {
                 UITabBar.appearance().backgroundColor = nil
                 UITabBar.appearance().isTranslucent = true
                 
+                // Force an initial tab bar reset to ensure correct appearance
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                    self.forceTabBarReset()
+                }
+                
                 // Set up notification observer for refresh after quick add
                 NotificationCenter.default.addObserver(forName: .refreshAfterQuickAdd, object: nil, queue: .main) { _ in
                     // Generate a new ID to force view refresh
                     refreshID = UUID()
                 }
+                
+                // Listen for theme changes
+                NotificationCenter.default.addObserver(forName: NSNotification.Name("ThemeColorChange"), object: nil, queue: .main) { _ in
+                    // Use the force reset method to completely refresh the tab bar
+                    self.forceTabBarReset()
+                    
+                    // Also use the recursive method as a backup
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+                       let rootViewController = window.rootViewController {
+                        
+                        // Find the main tab bar controller
+                        self.updateTabBarsRecursively(in: rootViewController)
+                    }
+                    
+                    // Force refresh the entire view by updating the refresh ID
+                    // This will cause the entire view hierarchy to redraw with new theme colors
+                    self.refreshID = UUID()
+                    
+                    // Schedule an additional refresh with a slight delay to handle edge cases
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                        self.forceTabBarReset()
+                        self.refreshID = UUID() // Force another refresh
+                    }
+                }
             }
             .onDisappear {
-                // Remove notification observer
+                // Remove notification observers
                 NotificationCenter.default.removeObserver(self, name: .refreshAfterQuickAdd, object: nil)
+                NotificationCenter.default.removeObserver(self, name: NSNotification.Name("ThemeColorChange"), object: nil)
             }
             
             // Floating action button that only appears on certain tabs
@@ -152,8 +206,7 @@ struct MainTabView: View {
                             QuickActionButton(showingSheet: $showingQuickAdd, currentTab: selectedTab)
                                 .id(selectedTab) // Force recreation when tab changes
                         }
-                        // Use more bottom padding and add extra for devices with home indicator
-                        .padding(.bottom, UIDevice.current.hasHomeIndicator ? 100 : 85)
+                        // Remove padding here since it's now in the QuickActionButton itself
                     }
                 }
             }
@@ -216,6 +269,194 @@ struct MainTabView: View {
                     NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
                 }
         }
+    }
+    
+    // Recursive function to find and update tab bars
+    private func updateTabBarsRecursively(in viewController: UIViewController) {
+        // If this is a tab bar controller, update it
+        if let tabBarController = viewController as? UITabBarController {
+            // Get the current theme
+            let theme = CurrentTheme.shared.activeTheme
+            let accentColor = UIColor(theme.accent)
+            let backgroundColor = UIColor(theme.background)
+            
+            // More aggressively update the tab bar
+            DispatchQueue.main.async {
+                // Direct updates to tab bar properties
+                tabBarController.tabBar.tintColor = accentColor
+                tabBarController.tabBar.backgroundColor = backgroundColor
+                tabBarController.tabBar.unselectedItemTintColor = UIColor.gray
+                
+                // Update each item explicitly, with more properties
+                if let items = tabBarController.tabBar.items {
+                    for (index, item) in items.enumerated() {
+                        // Clear any existing attributes first
+                        item.setTitleTextAttributes(nil, for: .normal)
+                        item.setTitleTextAttributes(nil, for: .selected)
+                        
+                        // Set new attributes with improved font settings
+                        item.setTitleTextAttributes([
+                            .foregroundColor: UIColor.gray,
+                            .font: UIFont.systemFont(ofSize: 10, weight: .medium)
+                        ], for: .normal)
+                        
+                        item.setTitleTextAttributes([
+                            .foregroundColor: accentColor,
+                            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+                        ], for: .selected)
+                        
+                        // If this is the selected item, explicitly set its properties
+                        if index == tabBarController.selectedIndex {
+                            item.badgeColor = accentColor
+                            // Force update selected item
+                            if let imageView = item.value(forKey: "view") as? UIView {
+                                imageView.tintColor = accentColor
+                                imageView.setNeedsDisplay()
+                            }
+                        }
+                    }
+                }
+                
+                // Apply immediate appearance with these properties
+                let tabAppearance = UITabBarAppearance()
+                tabAppearance.configureWithDefaultBackground()
+                tabAppearance.backgroundColor = backgroundColor
+                
+                let itemAppearance = UITabBarItemAppearance()
+                itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.gray]
+                itemAppearance.selected.titleTextAttributes = [.foregroundColor: accentColor]
+                
+                tabAppearance.stackedLayoutAppearance = itemAppearance
+                tabAppearance.inlineLayoutAppearance = itemAppearance
+                tabAppearance.compactInlineLayoutAppearance = itemAppearance
+                
+                tabBarController.tabBar.standardAppearance = tabAppearance
+                tabBarController.tabBar.scrollEdgeAppearance = tabAppearance
+                
+                // Force redraw
+                tabBarController.tabBar.setNeedsDisplay()
+                tabBarController.tabBar.layoutIfNeeded()
+                
+                // Extra step: try to force tab bar item views to update
+                tabBarController.viewWillLayoutSubviews()
+                tabBarController.viewDidLayoutSubviews()
+            }
+        }
+        
+        // Check child view controllers
+        for child in viewController.children {
+            updateTabBarsRecursively(in: child)
+        }
+        
+        // Check presented controller
+        if let presented = viewController.presentedViewController {
+            updateTabBarsRecursively(in: presented)
+        }
+        
+        // Check navigation controller's visible controller
+        if let navController = viewController as? UINavigationController,
+           let visibleController = navController.visibleViewController {
+            updateTabBarsRecursively(in: visibleController)
+        }
+    }
+    
+    // Add this helper method to MainTabView
+    private func forceTabBarReset() {
+        // This function uses a trick to force the tab bar to completely redraw
+        // by temporarily hiding it and showing it again
+        
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+           let rootViewController = window.rootViewController,
+           let tabBarController = findTabBarController(in: rootViewController) {
+            
+            // Get the current theme
+            let theme = CurrentTheme.shared.activeTheme
+            let accentColor = UIColor(theme.accent)
+            let backgroundColor = UIColor(theme.background)
+            
+            // Step 1: Store the current state
+            let selectedIndex = tabBarController.selectedIndex
+            let isHidden = tabBarController.tabBar.isHidden
+            
+            // Step 2: Hide the tab bar momentarily (forces a redraw cycle)
+            DispatchQueue.main.async {
+                // Hide
+                tabBarController.tabBar.isHidden = true
+                
+                // Update appearance while hidden
+                tabBarController.tabBar.tintColor = accentColor
+                tabBarController.tabBar.backgroundColor = backgroundColor
+                tabBarController.tabBar.unselectedItemTintColor = UIColor.gray
+                
+                // Update appearance settings
+                let appearance = UITabBarAppearance()
+                appearance.configureWithDefaultBackground()
+                appearance.backgroundColor = backgroundColor
+                
+                let itemAppearance = UITabBarItemAppearance()
+                itemAppearance.normal.titleTextAttributes = [.foregroundColor: UIColor.gray]
+                itemAppearance.selected.titleTextAttributes = [.foregroundColor: accentColor]
+                
+                appearance.stackedLayoutAppearance = itemAppearance
+                appearance.inlineLayoutAppearance = itemAppearance
+                appearance.compactInlineLayoutAppearance = itemAppearance
+                
+                tabBarController.tabBar.standardAppearance = appearance
+                tabBarController.tabBar.scrollEdgeAppearance = appearance
+                
+                // Show the tab bar again (completes the redraw cycle)
+                tabBarController.tabBar.isHidden = isHidden
+                
+                // Force layout update
+                tabBarController.tabBar.setNeedsLayout()
+                tabBarController.tabBar.layoutIfNeeded()
+                
+                // Select index again (forces selection refresh)
+                tabBarController.selectedIndex = selectedIndex
+                
+                // Update tab item properties directly
+                if let items = tabBarController.tabBar.items {
+                    for (_, item) in items.enumerated() {
+                        // Set properties for all items
+                        item.setTitleTextAttributes([
+                            .foregroundColor: UIColor.gray,
+                            .font: UIFont.systemFont(ofSize: 10, weight: .medium)
+                        ], for: .normal)
+                        
+                        item.setTitleTextAttributes([
+                            .foregroundColor: accentColor,
+                            .font: UIFont.systemFont(ofSize: 10, weight: .semibold)
+                        ], for: .selected)
+                    }
+                }
+            }
+        }
+    }
+    
+    // Helper method to find the tab bar controller
+    private func findTabBarController(in viewController: UIViewController?) -> UITabBarController? {
+        guard let viewController = viewController else { return nil }
+        
+        if let tabBarController = viewController as? UITabBarController {
+            return tabBarController
+        }
+        
+        if let navigationController = viewController as? UINavigationController {
+            return findTabBarController(in: navigationController.visibleViewController)
+        }
+        
+        if let presentedViewController = viewController.presentedViewController {
+            return findTabBarController(in: presentedViewController)
+        }
+        
+        for child in viewController.children {
+            if let tabBar = findTabBarController(in: child) {
+                return tabBar
+            }
+        }
+        
+        return nil
     }
 }
 
