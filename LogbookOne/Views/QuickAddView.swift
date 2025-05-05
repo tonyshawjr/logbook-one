@@ -484,6 +484,9 @@ struct QuickAddView: View {
     // For auto-focusing the text field
     @FocusState private var isDescriptionFocused: Bool
     
+    // Flag to determine if we should show the type selector (hide it when opened from FAB menu)
+    @State private var showTypeSelector: Bool = true
+    
     // Type-specific conversational prompts
     private let taskPrompts = [
         "Need to knock this out?",
@@ -523,12 +526,14 @@ struct QuickAddView: View {
         let savedType = UserDefaults.standard.integer(forKey: "lastUsedEntryType")
         _selectedType = State(initialValue: LogEntryType(rawValue: Int16(savedType)) ?? .task)
         _showDueDate = State(initialValue: false) // Explicitly start with no due date
+        _showTypeSelector = State(initialValue: true) // Show type selector in standard mode
     }
     
     // Initialize with a specific entry type (for context-aware quick add)
     init(initialEntryType: LogEntryType) {
         _selectedType = State(initialValue: initialEntryType)
         _showDueDate = State(initialValue: false) // Default to false for unscheduled tasks
+        _showTypeSelector = State(initialValue: false) // Hide type selector when a specific type is provided
         // Still save this as the last used type
         UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
     }
@@ -538,6 +543,7 @@ struct QuickAddView: View {
         _selectedType = State(initialValue: initialEntryType)
         _dueDate = State(initialValue: initialDate)
         _showDueDate = State(initialValue: true) // When initialized with a date, set showDueDate to true
+        _showTypeSelector = State(initialValue: false) // Hide type selector when a specific type is provided
         
         // Save as last used type
         UserDefaults.standard.set(Int(initialEntryType.rawValue), forKey: "lastUsedEntryType")
@@ -553,36 +559,50 @@ struct QuickAddView: View {
                 // Header with close button and tabs at the top
                 HStack {
                     // Type selector - Simple row of options
-                    HStack(spacing: 8) {
-                        ForEach(LogEntryType.allCases) { type in
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    selectedType = type
-                                    lastUsedEntryType = Int(type.rawValue)
-                                    showDueDate = type == .task
-                                    // Update the prompt when changing type
-                                    currentPrompt = getRandomPrompt(for: type)
+                    if showTypeSelector {
+                        HStack(spacing: 8) {
+                            ForEach(LogEntryType.allCases) { type in
+                                Button(action: {
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        selectedType = type
+                                        lastUsedEntryType = Int(type.rawValue)
+                                        showDueDate = type == .task
+                                        // Update the prompt when changing type
+                                        currentPrompt = getRandomPrompt(for: type)
+                                    }
+                                    // Don't auto-focus after animation completes
+                                    // Let the user tap when they want to type
+                                }) {
+                                    VStack(spacing: 8) {
+                                        Image(systemName: iconForType(type))
+                                            .font(.system(size: 20))
+                                            .foregroundColor(selectedType == type ? .white : .themeAccent)
+                                        
+                                        Text(type.displayName)
+                                            .font(.subheadline)
+                                            .fontWeight(selectedType == type ? .semibold : .regular)
+                                            .foregroundColor(selectedType == type ? .white : .themeAccent)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(selectedType == type ? Color.themeAccent : Color.themeAccent.opacity(0.05))
+                                    )
                                 }
-                                // Don't auto-focus after animation completes
-                                // Let the user tap when they want to type
-                            }) {
-                                VStack(spacing: 8) {
-                                    Image(systemName: iconForType(type))
-                                        .font(.system(size: 20))
-                                        .foregroundColor(selectedType == type ? .white : .themeAccent)
-                                    
-                                    Text(type.displayName)
-                                        .font(.subheadline)
-                                        .fontWeight(selectedType == type ? .semibold : .regular)
-                                        .foregroundColor(selectedType == type ? .white : .themeAccent)
-                                }
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 8)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .fill(selectedType == type ? Color.themeAccent : Color.themeAccent.opacity(0.05))
-                                )
                             }
+                        }
+                    } else {
+                        // Show a title instead of type selector when specific type is provided
+                        HStack {
+                            Image(systemName: iconForType(selectedType))
+                                .font(.system(size: 22))
+                                .foregroundColor(.themeAccent)
+                            
+                            Text("New \(selectedType.displayName)")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.themePrimary)
                         }
                     }
                     
@@ -603,7 +623,7 @@ struct QuickAddView: View {
                 .padding(.horizontal)
                 .padding(.top, keyboardIsShown ? 12 : 16)
                 
-                // Description field with fixed height
+                // Description field with fixed height - adjust based on type selector
                 TextField("", text: $description, axis: .vertical)
                     .placeholder(when: description.isEmpty) {
                         Text(currentPrompt)
@@ -611,7 +631,7 @@ struct QuickAddView: View {
                     }
                     .font(.title3)
                     .padding(.horizontal)
-                    .padding(.top, 8)
+                    .padding(.top, 6)
                     .focused($isDescriptionFocused)
                     .submitLabel(.done)
                     .onSubmit {
@@ -619,13 +639,14 @@ struct QuickAddView: View {
                             saveEntry()
                         }
                     }
-                    .frame(height: 120)
-                    .padding(.bottom, 8)
+                    .frame(height: showTypeSelector ? 120 : 100) // Slightly smaller when type selector is hidden
+                    .padding(.bottom, 4) // Reduce bottom padding
                 
-                Spacer()
+                // Compact spacer - reduce the empty space
+                Spacer(minLength: 20) // Use a smaller minimum length
                 
                 // Bottom fields area with fixed heights
-                VStack(spacing: 16) {
+                VStack(spacing: 12) { // Reduce spacing between elements
                     // Payment fields & client/date selection
                     HStack(spacing: 16) {
                         // Client selection for all types
@@ -745,7 +766,7 @@ struct QuickAddView: View {
                 .padding(.horizontal)
                 .padding(.bottom, 16)
             }
-            .frame(height: 420)
+            .frame(height: showTypeSelector ? 420 : 360) // Shorter height when type selector is hidden
         }
         .background(Color.clear) // Clear the default background to let our ZStack background handle it
         // Modals and pickers

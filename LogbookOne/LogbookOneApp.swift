@@ -36,8 +36,8 @@ struct LogbookOneApp: App {
         WindowGroup {
             ZStack {
                 if hasCompletedOnboarding {
-                    ContentView()
-                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
+            ContentView()
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
                         .preferredColorScheme(colorScheme)
                         .environment(\.theme, colorScheme == .dark ? DarkTheme : LightTheme)
                         .environmentObject(clientFormState)
