@@ -110,11 +110,20 @@ struct DashboardView: View {
             NSSortDescriptor(keyPath: \LogEntry.creationDate, ascending: false),
             NSSortDescriptor(keyPath: \LogEntry.date, ascending: false)
         ],
-        predicate: NSPredicate(format: "(type == %d AND isComplete == YES OR type == %d) AND (date >= %@ OR creationDate >= %@)", 
-                              LogEntryType.task.rawValue,
-                              LogEntryType.payment.rawValue,
-                              Calendar.current.startOfDay(for: Date()) as NSDate,
-                              Calendar.current.startOfDay(for: Date()) as NSDate),
+        predicate: NSCompoundPredicate(orPredicateWithSubpredicates: [
+            // Tasks that were completed today (their completion status changed today)
+            NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "type == %d", LogEntryType.task.rawValue),
+                NSPredicate(format: "isComplete == YES"),
+                // Task has a date of today or was modified today
+                NSPredicate(format: "date >= %@", Calendar.current.startOfDay(for: Date()) as NSDate)
+            ]),
+            // Payments created today
+            NSCompoundPredicate(andPredicateWithSubpredicates: [
+                NSPredicate(format: "type == %d", LogEntryType.payment.rawValue),
+                NSPredicate(format: "date >= %@", Calendar.current.startOfDay(for: Date()) as NSDate)
+            ])
+        ]),
         animation: .default)
     private var todayEntries: FetchedResults<LogEntry>
     
@@ -479,33 +488,8 @@ struct DashboardView: View {
         
         private func toggleTaskCompletion() {
             withAnimation {
-                let wasComplete = task.isComplete
                 task.isComplete.toggle()
-                
-                // If task is being completed (not uncompleted), create a completion entry
-                if !wasComplete && task.isComplete {
-                    createCompletionEntry()
-                }
-                
                 try? viewContext.save()
-            }
-        }
-        
-        private func createCompletionEntry() {
-            // Create a new log entry for the completed task to show in Today's Wins
-            let completionEntry = LogEntry(context: viewContext)
-            completionEntry.id = UUID()
-            completionEntry.type = LogEntryType.task.rawValue
-            completionEntry.desc = "Completed: \(task.desc ?? "Task")"
-            completionEntry.date = Date() // Current time
-            completionEntry.setValue(Date(), forKey: "creationDate") // Set creation date to now
-            completionEntry.isComplete = true
-            completionEntry.client = task.client
-            completionEntry.tag = task.tag
-            
-            // If the original task had an amount, copy it
-            if let amount = task.amount {
-                completionEntry.amount = amount
             }
         }
     }
