@@ -109,7 +109,9 @@ struct DashboardView: View {
             NSSortDescriptor(keyPath: \LogEntry.creationDate, ascending: false),
             NSSortDescriptor(keyPath: \LogEntry.date, ascending: false)
         ],
-        predicate: NSPredicate(format: "date >= %@ OR creationDate >= %@", 
+        predicate: NSPredicate(format: "(type == %d AND isComplete == YES OR type == %d) AND (date >= %@ OR creationDate >= %@)", 
+                              LogEntryType.task.rawValue,
+                              LogEntryType.payment.rawValue,
                               Calendar.current.startOfDay(for: Date()) as NSDate,
                               Calendar.current.startOfDay(for: Date()) as NSDate),
         animation: .default)
@@ -148,6 +150,25 @@ struct DashboardView: View {
                                Calendar.current.date(from: Calendar.current.dateComponents([.year], from: Date()))! as NSDate),
         animation: .default)
     private var yearlyPayments: FetchedResults<LogEntry>
+    
+    // For overdue tasks
+    @FetchRequest(
+        entity: LogEntry.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.date, ascending: true)],
+        predicate: NSPredicate(format: "type == %d AND isComplete == NO AND date < %@",
+                              LogEntryType.task.rawValue,
+                              Calendar.current.startOfDay(for: Date()) as NSDate),
+        animation: .default)
+    private var overdueTasks: FetchedResults<LogEntry>
+    
+    // For undated tasks
+    @FetchRequest(
+        entity: LogEntry.entity(),
+        sortDescriptors: [NSSortDescriptor(keyPath: \LogEntry.creationDate, ascending: false)],
+        predicate: NSPredicate(format: "type == %d AND isComplete == NO AND date == nil", 
+                              LogEntryType.task.rawValue),
+        animation: .default)
+    private var undatedTasks: FetchedResults<LogEntry>
     
     @State private var selectedRevenuePeriod: RevenuePeriod = .month
     
@@ -334,7 +355,7 @@ struct DashboardView: View {
         VStack(spacing: 12) {
             // Card header
             HStack {
-                Label("Task Overview", systemImage: "checkmark.circle")
+                Label("What to Tackle", systemImage: "checkmark.circle")
                     .font(.appHeadline)
                     .foregroundColor(.themePrimary)
                 
@@ -349,16 +370,11 @@ struct DashboardView: View {
             
             Divider()
             
-            // Task list display
+            // Minimal task list display
             VStack(alignment: .leading, spacing: 10) {
-                Text("Due Today")
-                    .font(.appSubheadline)
-                    .foregroundColor(.themeSecondary)
-                    .padding(.top, 4)
-                
-                if tasksForToday.isEmpty {
+                if tasksForToday.isEmpty && overdueTasks.isEmpty {
                     HStack {
-                        Text("No tasks due today")
+                        Text("No tasks for today")
                             .font(.appBody)
                             .foregroundColor(.themeSecondary)
                             .padding(.vertical, 8)
@@ -366,16 +382,46 @@ struct DashboardView: View {
                         Spacer()
                     }
                 } else {
-                    ForEach(tasksForToday) { task in
+                    // Show overdue tasks first
+                    ForEach(overdueTasks) { task in
                         NavigationLink(destination: EntryDetailView(entry: task)) {
-                            TaskRowView(task: task)
+                            MinimalTaskRowView(task: task, isOverdue: true)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        
-                        if task != tasksForToday.last {
-                            Divider()
-                                .padding(.vertical, 2)
+                    }
+                    
+                    // Today's tasks
+                    ForEach(tasksForToday) { task in
+                        NavigationLink(destination: EntryDetailView(entry: task)) {
+                            MinimalTaskRowView(task: task)
                         }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                
+                // Show up to 3 unscheduled tasks
+                if !undatedTasks.isEmpty {
+                    Divider()
+                        .padding(.vertical, 4)
+                    
+                    Text("Unscheduled")
+                        .font(.appSubheadline)
+                        .foregroundColor(.themeSecondary)
+                        .padding(.top, 4)
+                    
+                    let tasksToShow = undatedTasks.prefix(3)
+                    ForEach(Array(tasksToShow)) { task in
+                        NavigationLink(destination: EntryDetailView(entry: task)) {
+                            MinimalTaskRowView(task: task)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                    
+                    if undatedTasks.count > 3 {
+                        Text("+ \(undatedTasks.count - 3) more")
+                            .font(.caption)
+                            .foregroundColor(.themeSecondary)
+                            .padding(.top, 4)
                     }
                 }
             }
@@ -387,17 +433,11 @@ struct DashboardView: View {
         .padding(.horizontal)
     }
     
-    // Task row component for the task overview
-    private struct TaskRowView: View {
+    // Minimal task row component for the task overview
+    private struct MinimalTaskRowView: View {
         let task: LogEntry
+        var isOverdue: Bool = false
         @Environment(\.managedObjectContext) private var viewContext
-        
-        // Time formatter for consistent display
-        private let timeFormatter: DateFormatter = {
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            return formatter
-        }()
         
         var body: some View {
             HStack(alignment: .center, spacing: 12) {
@@ -407,62 +447,21 @@ struct DashboardView: View {
                 } label: {
                     Image(systemName: task.isComplete ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 20))
-                        .foregroundColor(task.isComplete ? .themeTask : .themeSecondary)
+                        .foregroundColor(task.isComplete ? .themeTask : (isOverdue ? .red : .themeSecondary))
                 }
                 .buttonStyle(BorderlessButtonStyle())
                 
-                // Task description
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(task.desc ?? "Untitled Task")
-                        .font(.appSubheadline)
-                        .foregroundColor(.themePrimary)
-                        .lineLimit(1)
-                    
-                    HStack(spacing: 6) {
-                        if let client = task.client?.name, !client.isEmpty {
-                            Text(client)
-                                .font(.appCaption)
-                                .foregroundColor(.themeSecondary)
-                        }
-                        
-                        if let tag = task.tag, !tag.isEmpty {
-                            Text("•")
-                                .font(.appCaption)
-                                .foregroundColor(.themeSecondary)
-                            
-                            Text(tag)
-                                .font(.appCaption)
-                                .foregroundColor(.themeSecondary)
-                        }
-                        
-                        // Show due time if it exists and is different from creation time
-                        if let date = task.date, isCustomDueTime(date) {
-                            Text("•")
-                                .font(.appCaption)
-                                .foregroundColor(.themeSecondary)
-                            
-                            Text("Due: \(timeFormatter.string(from: date))")
-                                .font(.appCaption)
-                                .foregroundColor(.themeSecondary)
-                        }
-                    }
-                }
+                // Just the task description
+                Text(task.desc ?? "Untitled Task")
+                    .font(.appSubheadline)
+                    .foregroundColor(isOverdue ? .red : .themePrimary)
+                    .lineLimit(1)
+                    .strikethrough(task.isComplete)
                 
                 Spacer()
-                
-                // Show when activity happened or task was created - NOT the scheduled time
-                if let creationDate = task.value(forKey: "creationDate") as? Date {
-                    Text(timeFormatter.string(from: creationDate))
-                        .font(.appCaption)
-                        .foregroundColor(.themeSecondary)
-                } else if let date = task.date {
-                    // Fallback to date only for legacy entries
-                    Text(timeFormatter.string(from: date))
-                        .font(.appCaption)
-                        .foregroundColor(.themeSecondary)
-                }
             }
             .contentShape(Rectangle())
+            .padding(.vertical, 4)
         }
         
         private func toggleTaskCompletion() {
@@ -479,22 +478,8 @@ struct DashboardView: View {
             }
         }
         
-        // Helper to determine if a due time should be shown
-        private func isCustomDueTime(_ date: Date) -> Bool {
-            // Check if we have a specific time set (not midnight or 9 AM default)
-            let calendar = Calendar.current
-            let timeComponents = calendar.dateComponents([.hour, .minute], from: date)
-            
-            // Don't show due time for default times (midnight or 9 AM)
-            let isDefaultTime = (timeComponents.hour == 0 && timeComponents.minute == 0) || 
-                               (timeComponents.hour == 9 && timeComponents.minute == 0)
-            
-            // Only show if it's not a default time and is in the future
-            return !isDefaultTime && date > Date()
-        }
-        
         private func createCompletionEntry() {
-            // Create a new log entry for the completed task to show in Today's Activity
+            // Create a new log entry for the completed task to show in Today's Wins
             let completionEntry = LogEntry(context: viewContext)
             completionEntry.id = UUID()
             completionEntry.type = LogEntryType.task.rawValue
@@ -514,7 +499,7 @@ struct DashboardView: View {
     
     private var sectionHeader: some View {
         HStack {
-            Text("Today's Activity")
+            Text("Today's Wins")
                 .font(.appTitle3)
             
             Spacer()
@@ -544,16 +529,16 @@ struct DashboardView: View {
     
     private var emptyStateView: some View {
         VStack(spacing: 24) {
-            Image(systemName: "doc.text")
+            Image(systemName: "trophy")
                 .font(.system(size: 60))
                 .foregroundColor(Color.themeSecondary.opacity(0.3))
                 .padding(.top, 30)
             
-            Text("No Entries Today")
+            Text("No Wins Yet Today")
                 .font(.appTitle2)
                 .foregroundColor(.themePrimary)
             
-            Text("Use the + button to add a new entry")
+            Text("Complete tasks or log payments to see them here")
                 .font(.appBody)
                 .foregroundColor(.themeSecondary)
                 .multilineTextAlignment(.center)
@@ -612,18 +597,6 @@ struct LogEntryCard: View {
         return formatter
     }()
     
-    // For debugging
-    init(entry: LogEntry) {
-        self.entry = entry
-        
-        // Check if creation date exists for debug purposes
-        if let creationDate = entry.value(forKey: "creationDate") as? Date {
-            print("Entry \(entry.id?.uuidString ?? "unknown") has creationDate: \(creationDate)")
-        } else {
-            print("Entry \(entry.id?.uuidString ?? "unknown") has NO creationDate, falling back to date: \(entry.date ?? Date())")
-        }
-    }
-    
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Header with type badge and time
@@ -651,11 +624,25 @@ struct LogEntryCard: View {
                 .foregroundColor(.themePrimary)
                 .padding(.top, 4)
             
-            // Description
-            Text(entry.desc ?? "")
-                .font(.appBody)
-                .foregroundColor(.themeSecondary)
-                .lineLimit(2)
+            // Description - show with visual indicator if it's a completed task
+            if entry.type == LogEntryType.task.rawValue && entry.isComplete {
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.themeTask)
+                        .font(.system(size: 16))
+                    
+                    Text(entry.desc ?? "")
+                        .font(.appBody)
+                        .foregroundColor(.themeSecondary)
+                        .strikethrough(true)
+                        .lineLimit(2)
+                }
+            } else {
+                Text(entry.desc ?? "")
+                    .font(.appBody)
+                    .foregroundColor(.themeSecondary)
+                    .lineLimit(2)
+            }
             
             // Show amount for payment entries
             if entry.type == LogEntryType.payment.rawValue, 

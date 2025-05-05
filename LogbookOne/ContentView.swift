@@ -27,6 +27,11 @@ extension UIDevice {
     }
 }
 
+// Notification name for refreshing views after quick add
+extension Notification.Name {
+    static let refreshAfterQuickAdd = Notification.Name("refreshAfterQuickAdd")
+}
+
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -45,6 +50,7 @@ struct ContentView: View {
 struct MainTabView: View {
     @State private var showingQuickAdd = false
     @State private var selectedTab = 0
+    @State private var refreshID = UUID() // For forcing view refresh
     
     // Environment to pass to the various views
     @Environment(\.managedObjectContext) private var viewContext
@@ -61,6 +67,7 @@ struct MainTabView: View {
                 NavigationStack {
                     DashboardView()
                         .environment(\.managedObjectContext, viewContext)
+                        .id(refreshID) // Force refresh when ID changes
                 }
                 .tabItem {
                     Label("Today", systemImage: "house")
@@ -70,6 +77,7 @@ struct MainTabView: View {
                 NavigationStack {
                     TasksView()
                         .environment(\.managedObjectContext, viewContext)
+                        .id(refreshID) // Force refresh when ID changes
                 }
                 .tabItem {
                     Label("Tasks", systemImage: "checkmark.circle")
@@ -79,6 +87,7 @@ struct MainTabView: View {
                 NavigationStack {
                     NotesView()
                         .environment(\.managedObjectContext, viewContext)
+                        .id(refreshID) // Force refresh when ID changes
                 }
                 .tabItem {
                     Label("Notes", systemImage: "doc.text")
@@ -88,6 +97,7 @@ struct MainTabView: View {
                 NavigationStack {
                     PaymentsView()
                         .environment(\.managedObjectContext, viewContext)
+                        .id(refreshID) // Force refresh when ID changes
                 }
                 .tabItem {
                     Label("Payments", systemImage: "dollarsign.circle")
@@ -98,6 +108,7 @@ struct MainTabView: View {
                     ClientListView()
                         .environment(\.managedObjectContext, viewContext)
                         .environmentObject(clientFormState)
+                        .id(refreshID) // Force refresh when ID changes
                 }
                 .tabItem {
                     Label("Clients", systemImage: "person.3")
@@ -118,12 +129,21 @@ struct MainTabView: View {
                 // Only adjust generic settings here
                 UITabBar.appearance().backgroundColor = nil
                 UITabBar.appearance().isTranslucent = true
+                
+                // Set up notification observer for refresh after quick add
+                NotificationCenter.default.addObserver(forName: .refreshAfterQuickAdd, object: nil, queue: .main) { _ in
+                    // Generate a new ID to force view refresh
+                    refreshID = UUID()
+                }
+            }
+            .onDisappear {
+                // Remove notification observer
+                NotificationCenter.default.removeObserver(self, name: .refreshAfterQuickAdd, object: nil)
             }
             
-            // Separate floating button layer with better visibility control
+            // Floating action button that only appears on certain tabs
             ZStack {
                 // Only show on tabs 0-3 (Today, Tasks, Notes, Payments)
-                // Tab 4 is now Clients
                 if [0, 1, 2, 3].contains(selectedTab) {
                     VStack {
                         Spacer() // Push to bottom
@@ -144,15 +164,35 @@ struct MainTabView: View {
                 switch selectedTab {
                 case 0: // Dashboard
                     QuickAddView()
+                        .onDisappear {
+                            // Post notification to refresh views when sheet dismisses
+                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                        }
                 case 1: // Tasks
                     QuickAddView(initialEntryType: .task)
+                        .onDisappear {
+                            // Post notification to refresh views when sheet dismisses
+                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                        }
                 case 2: // Notes
                     QuickAddView(initialEntryType: .note)
+                        .onDisappear {
+                            // Post notification to refresh views when sheet dismisses
+                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                        }
                 case 3: // Payments
                     QuickAddView(initialEntryType: .payment)
+                        .onDisappear {
+                            // Post notification to refresh views when sheet dismisses
+                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                        }
                 default:
                     // Fallback for any other tab (though this shouldn't happen)
                     QuickAddView()
+                        .onDisappear {
+                            // Post notification to refresh views when sheet dismisses
+                            NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                        }
                 }
             }
             .presentationDragIndicator(.hidden)
@@ -171,6 +211,10 @@ struct MainTabView: View {
                 .presentationBackground(Color(uiColor: .systemBackground))
                 .presentationCornerRadius(24)
                 .interactiveDismissDisabled(false)
+                .onDisappear {
+                    // Post notification to refresh views when sheet dismisses
+                    NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                }
         }
     }
 }
