@@ -560,7 +560,7 @@ struct TaskCardView: View {
     }
     
     private func toggleCompletion() {
-        let wasComplete = isComplete
+        _ = isComplete
         isComplete.toggle()
         task.isComplete = isComplete
         
@@ -677,7 +677,7 @@ struct UnscheduledTaskCardView: View {
     }
     
     private func toggleCompletion() {
-        let wasComplete = isComplete
+        _ = isComplete
         isComplete.toggle()
         task.isComplete = isComplete
         

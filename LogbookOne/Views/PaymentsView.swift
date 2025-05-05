@@ -45,14 +45,7 @@ struct PaymentsView: View {
         var tags = ["#all"]
         
         // Payments source for extracting hashtags - filter by client if one is selected
-        let paymentSource: [LogEntry]
-        if let selectedClient = selectedClient {
-            // Only use payments from selected client
-            paymentSource = payments(excluding: [])
-        } else {
-            // Use all payments if no client is selected
-            paymentSource = payments(excluding: [])
-        }
+        let paymentSource: [LogEntry] = payments(excluding: [])
         
         // Extract hashtags from the payments descriptions
         tags.append(contentsOf: HashtagExtractor.uniqueHashtags(from: paymentSource))
