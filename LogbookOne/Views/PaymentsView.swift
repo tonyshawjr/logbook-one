@@ -35,12 +35,32 @@ struct PaymentsView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @State private var selectedClient: Client? = nil
     @State private var selectedPeriod: TimePeriod = .month
+    @State private var selectedTag: String? = "#all"
     @State private var showingAddPayment = false
     @State private var showingClientPicker = false
     @State private var showingPeriodPicker = false
     
+    // Get all unique hashtags from the payments
+    private var allHashtags: [String] {
+        var tags = ["#all"]
+        
+        // Payments source for extracting hashtags - filter by client if one is selected
+        let paymentSource: [LogEntry]
+        if let selectedClient = selectedClient {
+            // Only use payments from selected client
+            paymentSource = payments(excluding: [])
+        } else {
+            // Use all payments if no client is selected
+            paymentSource = payments(excluding: [])
+        }
+        
+        // Extract hashtags from the payments descriptions
+        tags.append(contentsOf: HashtagExtractor.uniqueHashtags(from: paymentSource))
+        return tags
+    }
+    
     // Custom fetch request that updates whenever filter changes
-    var payments: [LogEntry] {
+    func payments(excluding: [NSPredicate] = []) -> [LogEntry] {
         // Build the predicate based on filters
         var predicates: [NSPredicate] = []
         
@@ -55,6 +75,18 @@ struct PaymentsView: View {
         // Filter by client if selected
         if let client = selectedClient {
             predicates.append(NSPredicate(format: "client == %@", client))
+        }
+        
+        // Filter by hashtag if selected
+        if let tag = selectedTag, tag != "#all" {
+            // Either the tag field contains the hashtag, or the description contains the hashtag
+            let tagPredicate = NSPredicate(format: "tag CONTAINS[c] %@ OR desc CONTAINS[c] %@", tag, tag)
+            predicates.append(tagPredicate)
+        }
+        
+        // Add any exclusion predicates
+        for predicate in excluding {
+            predicates.append(NSCompoundPredicate(notPredicateWithSubpredicate: predicate))
         }
         
         // Combine predicates with AND
@@ -79,7 +111,10 @@ struct PaymentsView: View {
         let today = calendar.startOfDay(for: Date())
         let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
         
-        let grouped = Dictionary(grouping: payments) { payment -> String in
+        // Get payments with current filters
+        let filteredPayments = payments()
+        
+        let grouped = Dictionary(grouping: filteredPayments) { payment -> String in
             guard let date = payment.date else { return "Undated" }
             
             let paymentDate = calendar.startOfDay(for: date)
@@ -175,6 +210,28 @@ struct PaymentsView: View {
                     )
                 }
                 
+                // Hashtag filter view (if we have any tags)
+                if allHashtags.count > 1 { // More than just "#all"
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
+                            ForEach(allHashtags, id: \.self) { tag in
+                                Button(action: { selectedTag = tag }) {
+                                    Text(tag)
+                                        .font(.appSubheadline)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(selectedTag == tag ? Color.themeAccent : Color.themeCard)
+                                        .foregroundColor(selectedTag == tag ? .white : .themePrimary)
+                                        .cornerRadius(20)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 10)
+                    }
+                    .background(Color.themeBackground)
+                }
+                
                 // Payment history title
                 HStack {
                     Text("Payment History")
@@ -189,7 +246,7 @@ struct PaymentsView: View {
                 .padding(.bottom, 6)
                 
                 // Payments list with timeline
-                if payments.isEmpty {
+                if payments().isEmpty {
                     emptyStateView
                 } else {
                     // Updated to use timeline style like Notes view
@@ -240,14 +297,14 @@ struct PaymentsView: View {
             
             HStack {
                 // Payment count
-                Text("\(payments.count) payment\(payments.count == 1 ? "" : "s")")
+                Text("\(payments().count) payment\(payments().count == 1 ? "" : "s")")
                     .font(.appCaption)
                     .foregroundColor(.themeSecondary)
                 
                 Spacer()
                 
                 // Avg payment
-                if payments.count > 0 {
+                if payments().count > 0 {
                     Text("Avg: \(formatCurrency(averageAmount))")
                         .font(.appCaption)
                         .foregroundColor(.themeSecondary)
@@ -324,7 +381,7 @@ struct PaymentsView: View {
     }
     
     private var totalAmount: Double {
-        payments.reduce(0) { total, payment in
+        payments().reduce(0) { total, payment in
             if let amount = payment.amount as NSDecimalNumber? {
                 return total + amount.doubleValue
             }
@@ -333,7 +390,7 @@ struct PaymentsView: View {
     }
     
     private var averageAmount: Double {
-        payments.isEmpty ? 0 : totalAmount / Double(payments.count)
+        payments().isEmpty ? 0 : totalAmount / Double(payments().count)
     }
     
     private func getDatePredicate(for period: TimePeriod) -> NSPredicate? {
@@ -368,7 +425,7 @@ struct PaymentsView: View {
     private func getPaymentData() -> [PaymentDataPoint] {
         var result: [PaymentDataPoint] = []
         
-        for payment in payments {
+        for payment in payments() {
             if let date = payment.date,
                let amount = payment.amount as NSDecimalNumber? {
                 result.append(PaymentDataPoint(date: date, amount: amount.doubleValue))
@@ -681,10 +738,11 @@ struct PaymentTimelineCard: View {
                             .foregroundColor(.themePrimary)
                     }
                     
-                    Text(payment.desc ?? "")
-                        .font(.subheadline)
-                        .foregroundColor(.themeSecondary)
-                        .lineLimit(2)
+                    // Use FormattedNoteText to display hashtags with formatting
+                    if let desc = payment.desc {
+                        FormattedNoteText(text: desc)
+                            .lineLimit(2)
+                    }
                 }
                 
                 // Amount with trailing time
@@ -705,8 +763,10 @@ struct PaymentTimelineCard: View {
                     }
                 }
                 
-                // Show tag if it exists
-                if let tag = payment.tag, !tag.isEmpty {
+                // Show tag if it exists (not as a hashtag in description)
+                // Only show if it's not already in the description as a hashtag
+                if let tag = payment.tag, !tag.isEmpty, 
+                   let desc = payment.desc, !desc.localizedCaseInsensitiveContains(tag) {
                     Text(tag)
                         .font(.footnote)
                         .padding(.horizontal, 10)

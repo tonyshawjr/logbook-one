@@ -899,8 +899,8 @@ struct QuickAddView: View {
         entry.client = selectedClient
         
         // For notes, automatically extract hashtags from the description
-        if selectedType == .note {
-            // Extract hashtags from the note text
+        if selectedType == .note || selectedType == .payment {
+            // Extract hashtags from the text
             let extractedTags = HashtagExtractor.extractHashtags(from: description)
             if !extractedTags.isEmpty {
                 // Join tags with commas for storage
@@ -910,7 +910,7 @@ struct QuickAddView: View {
                 entry.tag = selectedTag
             }
         } else {
-            // For other entry types, use the selected tag
+            // For task entry type, use the selected tag
             entry.tag = selectedTag.isEmpty ? nil : selectedTag
         }
         
