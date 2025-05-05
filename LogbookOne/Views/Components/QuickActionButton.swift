@@ -17,7 +17,7 @@ struct QuickActionButton: View {
     
     // Define the FAB menu items
     private let menuItems: [(type: LogEntryType, icon: String, label: String)] = [
-        (.task, "checkmark.square", "Task"),
+        (.task, "checkmark.circle", "Task"),
         (.note, "doc.text", "Note"),
         (.payment, "dollarsign.circle", "Payment")
     ]
@@ -26,6 +26,15 @@ struct QuickActionButton: View {
         // Only render actual content if we're on an allowed tab
         if allowedTabs.contains(currentTab) {
             ZStack {
+                // Background overlay for closing the menu when tapping elsewhere
+                if isMenuExpanded {
+                    Color.black.opacity(0.01)
+                        .edgesIgnoringSafeArea(.all)
+                        .onTapGesture {
+                            closeMenu()
+                        }
+                }
+                
                 VStack {
                     Spacer()
                     HStack {
@@ -120,10 +129,7 @@ struct QuickActionButton: View {
         impactMed.impactOccurred()
         
         // Close the menu
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-            isMenuExpanded = false
-            pulseAmount = 1.0
-        }
+        closeMenu()
         
         // Show the appropriate quick add sheet
         selectedType = type
@@ -131,6 +137,14 @@ struct QuickActionButton: View {
         // Tell NagMode that the user is logging an entry
         if nagManager.showInAppNag {
             nagManager.userLoggedEntry()
+        }
+    }
+    
+    // Helper to close the menu
+    private func closeMenu() {
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            isMenuExpanded = false
+            pulseAmount = 1.0
         }
     }
     
