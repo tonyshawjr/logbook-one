@@ -3,7 +3,7 @@ import CoreData
 
 struct ClientListView: View {
     @Environment(\.managedObjectContext) private var viewContext
-    @State private var showingAddClient = false
+    @EnvironmentObject var clientFormState: ClientFormState
     @State private var searchText = ""
     
     @FetchRequest(
@@ -23,11 +23,38 @@ struct ClientListView: View {
     }
     
     var body: some View {
-        ScrollView {
-            if clients.isEmpty {
-                emptyStateView
-            } else {
-                clientsList
+        VStack(spacing: 0) {
+            // Clients header view
+            HStack {
+                // Title with large font matching NotesView
+                Text("Clients")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.themePrimary)
+                
+                Spacer()
+                
+                // Add a direct button to show client form
+                Button(action: {
+                    clientFormState.showClientForm()
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title2)
+                        .foregroundColor(.themeAccent)
+                }
+                .padding(.trailing, 8)
+            }
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+            .background(Color.themeBackground)
+            
+            ScrollView {
+                if clients.isEmpty {
+                    emptyStateView
+                } else {
+                    clientsList
+                }
             }
         }
         .background(Color.themeBackground)
@@ -36,9 +63,6 @@ struct ClientListView: View {
         .toolbar(.hidden, for: .navigationBar)
         .toolbarBackground(Color.themeBackground, for: .navigationBar)
         .toolbarBackground(.visible, for: .navigationBar)
-        .sheet(isPresented: $showingAddClient) {
-            ClientFormView()
-        }
     }
     
     private var emptyStateView: some View {
@@ -47,7 +71,11 @@ struct ClientListView: View {
             title: "No Clients Yet",
             message: "Add your first client to start tracking your work",
             buttonText: "Add Your First Client",
-            action: { showingAddClient = true }
+            action: {
+                let generator = UIImpactFeedbackGenerator(style: .medium)
+                generator.impactOccurred()
+                clientFormState.showClientForm()
+            }
         )
     }
     

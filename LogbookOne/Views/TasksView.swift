@@ -105,21 +105,27 @@ struct TasksView: View {
                 
                 ScrollView {
                     VStack(spacing: 0) {
+                        // Tasks header view
+                        HStack {
+                            // Title with large font matching NotesView
+                            Text("Tasks")
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                                .foregroundColor(.themePrimary)
+                            
+                            Spacer()
+                        }
+                        .padding(.horizontal)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+                        .background(Color.themeBackground)
+                        
                         // Week view header
                         weekCalendarHeader
                         
                         Divider()
                             .padding(.horizontal)
-                        
-                        // Display selected day name
-                        HStack {
-                            Text(dayFormatter.string(from: selectedDate))
-                                .font(.appSubheadline)
-                                .foregroundColor(.themeSecondary)
-                                .padding(.leading)
-                                .padding(.top, 16)
-                            Spacer()
-                        }
+                            .padding(.bottom, 8)
                         
                         // Scheduled tasks section
                         if tasksForSelectedDay.isEmpty && overdueTasks.isEmpty {
@@ -162,27 +168,6 @@ struct TasksView: View {
                         Spacer(minLength: 80)
                     }
                 }
-                
-                // Single floating action button
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: { showingAddTask = true }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
-                                .background(
-                                    Circle()
-                                        .fill(Color.themeAccent)
-                                        .shadow(color: Color.themeAccent.opacity(0.3), radius: 5, x: 0, y: 3)
-                                )
-                        }
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 20)
-                    }
-                }
             }
             .onChange(of: selectedDate) { oldValue, newValue in
                 updateFetchRequest()
@@ -195,18 +180,19 @@ struct TasksView: View {
             .toolbarBackground(Color.themeBackground, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .sheet(isPresented: $showingAddTask) {
+                // Use the selectedDate as the initial date for the new task
                 QuickAddView(initialEntryType: .task, initialDate: selectedDate)
-                    .environment(\.managedObjectContext, viewContext)
                     .presentationDragIndicator(.hidden)
                     .presentationDetents([.height(420)])
                     .presentationBackground(Color(uiColor: .systemBackground))
                     .presentationCornerRadius(24)
                     .interactiveDismissDisabled(false)
+                    .environment(\.managedObjectContext, viewContext)
             }
             .sheet(isPresented: $showMonthPicker) {
                 MonthPickerView(selectedDate: $selectedDate)
                     .presentationDetents([.medium])
-                    .environment(\.managedObjectContext, viewContext)
+                    .presentationBackground(Color(uiColor: .systemBackground))
             }
         }
     }

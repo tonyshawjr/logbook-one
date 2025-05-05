@@ -28,7 +28,7 @@ struct ClientFormView: View {
                 Button(action: { dismiss() }) {
                     ZStack {
                         Circle()
-                            .fill(Color.green)
+                            .fill(Color.themeAccent)
                             .frame(width: 44, height: 44)
                         
                         Image(systemName: "xmark")
@@ -113,7 +113,7 @@ struct ClientFormView: View {
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(isFormValid ? Color.green : Color.green.opacity(0.5))
+                        .background(isFormValid ? Color.themeAccent : Color.themeAccent.opacity(0.5))
                         .cornerRadius(12)
                 }
                 .disabled(!isFormValid)
@@ -129,11 +129,11 @@ struct ClientFormView: View {
                         VStack {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 60))
-                                .foregroundColor(.green)
+                                .foregroundColor(.themeAccent)
                             
                             Text("Saved!")
                                 .font(.title3.weight(.medium))
-                                .foregroundColor(.green)
+                                .foregroundColor(.themeAccent)
                                 .padding(.top, 4)
                         }
                     }

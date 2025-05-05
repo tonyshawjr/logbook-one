@@ -8,21 +8,39 @@ enum TimeOfDay {
     case evening
     case night
     
-    var greeting: String {
-        switch self {
-        case .morning: return "Good morning"
-        case .midday: return "Hey"
-        case .evening: return "Good evening"
-        case .night: return "Still working"
-        }
-    }
-    
     var message: String {
         switch self {
-        case .morning: return "Let's win the day."
-        case .midday: return "You're halfway there."
-        case .evening: return "Need to wrap up anything?"
-        case .night: return "Late night grind?"
+        case .morning:
+            let messages = [
+                "Jumpstart your morning and make it productive.",
+                "A fresh start is a chance to move the needle.",
+                "Set your tone before the day sets it for you."
+            ]
+            return messages.randomElement() ?? messages[0]
+            
+        case .midday:
+            let messages = [
+                "Keep the momentum going.",
+                "Knock out the next right thing.",
+                "Progress over perfection—keep building."
+            ]
+            return messages.randomElement() ?? messages[0]
+            
+        case .evening:
+            let messages = [
+                "End the day with clarity, not with clutter.",
+                "Clean it up or plan it out—both are wins.",
+                "A little progress now makes tomorrow easier."
+            ]
+            return messages.randomElement() ?? messages[0]
+            
+        case .night:
+            let messages = [
+                "Planning late? Just prep one step ahead.",
+                "Organize your thoughts, then rest your mind.",
+                "Even quiet hours can move the mission forward."
+            ]
+            return messages.randomElement() ?? messages[0]
         }
     }
 }
@@ -194,22 +212,47 @@ struct DashboardView: View {
     // Personal greeting based on time of day
     private var personalGreeting: some View {
         let timeOfDay = getCurrentTimeOfDay()
-        let firstName = getFirstName(from: userName)
         
-        return VStack(alignment: .leading, spacing: 4) {
-            Text("\(timeOfDay.greeting), \(firstName).")
-                .font(.appTitle)
-                .fontWeight(.bold)
-                .foregroundColor(.themePrimary)
+        return VStack(alignment: .leading, spacing: 16) {
+            // Simple greeting with first name and wave emoji
+            HStack {
+                Text("Hello \(getFirstName())! 👋")
+                    .font(.system(size: 22, weight: .regular))
+                    .foregroundColor(.themePrimary)
+                
+                Spacer()
+                
+                // Settings button
+                NavigationLink(destination: SettingsView()) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 22))
+                        .foregroundColor(.themeAccent)
+                        .padding(10)
+                        .background(
+                            Circle()
+                                .fill(Color.themeAccent.opacity(0.1))
+                        )
+                }
+            }
             
+            // Main tagline - make this the headline
             Text(timeOfDay.message)
-                .font(.appSubheadline)
-                .foregroundColor(.themeSecondary)
+                .font(.system(size: 32, weight: .bold))
+                .foregroundColor(.themePrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
         .padding(.top, 16)
         .padding(.bottom, 8)
+    }
+    
+    // Helper to extract first name from full name
+    private func getFirstName() -> String {
+        guard !userName.isEmpty else { return "there" }
+        
+        let components = userName.components(separatedBy: " ")
+        return components.first ?? userName
     }
     
     // Function to get time of day for appropriate greeting
@@ -218,22 +261,18 @@ struct DashboardView: View {
         
         switch hour {
         case 5..<12:
+            // Morning (5:00 AM – 11:59 AM)
             return .morning
         case 12..<17:
+            // Afternoon (12:00 PM – 4:59 PM)
             return .midday
-        case 17..<21:
+        case 17..<22:
+            // Evening (5:00 PM – 9:59 PM)
             return .evening
         default:
+            // Night (10:00 PM – 4:59 AM)
             return .night
         }
-    }
-    
-    // Extract first name from full name
-    private func getFirstName(from fullName: String) -> String {
-        guard !fullName.isEmpty else { return "there" }
-        
-        let components = fullName.components(separatedBy: " ")
-        return components.first ?? fullName
     }
     
     private var revenueCard: some View {

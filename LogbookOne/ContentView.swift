@@ -8,6 +8,25 @@
 import SwiftUI
 import CoreData
 
+// Extension to check if the device has a home indicator (iPhone X and later)
+extension UIDevice {
+    var hasHomeIndicator: Bool {
+        if #available(iOS 15.0, *) {
+            // Use the recommended approach for iOS 15+
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let keyWindow = windowScene.windows.first(where: { $0.isKeyWindow }) else {
+                return false
+            }
+            return keyWindow.safeAreaInsets.bottom > 0
+        } else {
+            // Fallback for iOS versions before 15.0
+            let windows = UIApplication.shared.windows
+            let keyWindow = windows.first(where: { $0.isKeyWindow })
+            return keyWindow?.safeAreaInsets.bottom ?? 0 > 0
+        }
+    }
+}
+
 struct ContentView: View {
     @Environment(\.managedObjectContext) private var viewContext
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
@@ -30,13 +49,18 @@ struct MainTabView: View {
     // Environment to pass to the various views
     @Environment(\.managedObjectContext) private var viewContext
     @Environment(\.colorScheme) private var colorScheme
+    @EnvironmentObject private var clientFormState: ClientFormState
+    
+    // References to view state
+    @State private var tasksViewShowingAdd = false
     
     var body: some View {
         ZStack {
-            // Tab view
+            // Tab view as base layer
             TabView(selection: $selectedTab) {
                 NavigationStack {
                     DashboardView()
+                        .environment(\.managedObjectContext, viewContext)
                 }
                 .tabItem {
                     Label("Today", systemImage: "house")
@@ -45,6 +69,7 @@ struct MainTabView: View {
                 
                 NavigationStack {
                     TasksView()
+                        .environment(\.managedObjectContext, viewContext)
                 }
                 .tabItem {
                     Label("Tasks", systemImage: "checkmark.circle")
@@ -53,6 +78,7 @@ struct MainTabView: View {
                 
                 NavigationStack {
                     NotesView()
+                        .environment(\.managedObjectContext, viewContext)
                 }
                 .tabItem {
                     Label("Notes", systemImage: "doc.text")
@@ -61,6 +87,7 @@ struct MainTabView: View {
                 
                 NavigationStack {
                     PaymentsView()
+                        .environment(\.managedObjectContext, viewContext)
                 }
                 .tabItem {
                     Label("Payments", systemImage: "dollarsign.circle")
@@ -68,59 +95,54 @@ struct MainTabView: View {
                 .tag(3)
                 
                 NavigationStack {
-                    MoreView()
+                    ClientListView()
+                        .environment(\.managedObjectContext, viewContext)
+                        .environmentObject(clientFormState)
                 }
                 .tabItem {
-                    Label("More", systemImage: "ellipsis")
+                    Label("Clients", systemImage: "person.3")
                 }
                 .tag(4)
             }
             .tint(Color.themeAccent)
             .environment(\.managedObjectContext, viewContext)
+            .environmentObject(clientFormState)
+            .onChange(of: selectedTab) { oldValue, newValue in
+                // Request layout update with a simple approach
+                DispatchQueue.main.async {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
+            }
             .onAppear {
-                // Reset any unwanted tab bar appearance settings
-                let appearance = UITabBarAppearance()
-                appearance.configureWithDefaultBackground()
-                UITabBar.appearance().standardAppearance = appearance
-                UITabBar.appearance().scrollEdgeAppearance = appearance
+                // Let the specialized UITabBarAppearance from LogbookOneApp take precedence
+                // Only adjust generic settings here
                 UITabBar.appearance().backgroundColor = nil
                 UITabBar.appearance().isTranslucent = true
             }
             
-            // Quick add button as a floating layer
-            if selectedTab != 1 && selectedTab != 4 { // Hide when on Tasks or More tab
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            // Use haptic feedback when pressing button
-                            let impactMed = UIImpactFeedbackGenerator(style: .medium)
-                            impactMed.impactOccurred()
-                            
-                            showingQuickAdd = true
-                        }) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 60, height: 60)
-                                .background(
-                                    Circle()
-                                        .fill(Color.themeAccent)
-                                        .shadow(color: Color.themeAccent.opacity(0.3), radius: 5, x: 0, y: 3)
-                                )
+            // Separate floating button layer with better visibility control
+            ZStack {
+                // Only show on tabs 0-3 (Today, Tasks, Notes, Payments)
+                // Tab 4 is now Clients
+                if [0, 1, 2, 3].contains(selectedTab) {
+                    VStack {
+                        Spacer() // Push to bottom
+                        HStack {
+                            Spacer() // Push to right
+                            QuickActionButton(showingSheet: $showingQuickAdd, currentTab: selectedTab)
+                                .id(selectedTab) // Force recreation when tab changes
                         }
-                        .buttonStyle(ScaleButtonStyle())
-                        .padding(.trailing, 20)
-                        .padding(.bottom, 80) // Position above tab bar
+                        // Use more bottom padding and add extra for devices with home indicator
+                        .padding(.bottom, UIDevice.current.hasHomeIndicator ? 100 : 85)
                     }
                 }
             }
+            .ignoresSafeArea(.all)
         }
         .sheet(isPresented: $showingQuickAdd) {
             Group {
                 switch selectedTab {
-                case 0: // Dashboard - show general quick add
+                case 0: // Dashboard
                     QuickAddView()
                 case 1: // Tasks
                     QuickAddView(initialEntryType: .task)
@@ -128,10 +150,9 @@ struct MainTabView: View {
                     QuickAddView(initialEntryType: .note)
                 case 3: // Payments
                     QuickAddView(initialEntryType: .payment)
-                case 4: // More tab - show client form
-                    ClientFormView()
                 default:
-                    Text("Nothing to add on this screen")
+                    // Fallback for any other tab (though this shouldn't happen)
+                    QuickAddView()
                 }
             }
             .presentationDragIndicator(.hidden)
@@ -140,6 +161,16 @@ struct MainTabView: View {
             .presentationCornerRadius(24)
             .interactiveDismissDisabled(false)
             .environment(\.managedObjectContext, viewContext)
+        }
+        // Global client form presentation
+        .sheet(isPresented: $clientFormState.showingAddClient) {
+            ClientFormView()
+                .environment(\.managedObjectContext, viewContext)
+                .presentationDragIndicator(.hidden)
+                .presentationDetents([.height(420)])
+                .presentationBackground(Color(uiColor: .systemBackground))
+                .presentationCornerRadius(24)
+                .interactiveDismissDisabled(false)
         }
     }
 }

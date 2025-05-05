@@ -26,8 +26,6 @@ struct SettingsView: View {
     @AppStorage("userName") private var userName: String = ""
     @State private var tempUserName: String = ""
     @State private var editingName: Bool = false
-    @State private var userImage: UIImage? = nil
-    @State private var showingImagePicker = false
     
     // Sample data
     @State private var useSampleData: Bool = false
@@ -48,39 +46,49 @@ struct SettingsView: View {
     private let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
     private let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     
-    // Set of avatars
-    private let avatars = ["person.crop.circle", "person.crop.circle.fill", "person.bust.fill", "person.fill", "figure.wave", "figure.stand", "figure.run", "figure.mind.and.body"]
-    
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Account section
-                accountSection
+        VStack(spacing: 0) {
+            // Settings header view - consistent with other views
+            HStack {
+                Text("Settings")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .foregroundColor(.themePrimary)
                 
-                // Settings sections
-                appearanceSection
-                preferencesSection
-                dataSection
-                supportSection
-                legalSection
-                aboutSection
-                
-                // Footer note
-                Text("Logbook One v\(appVersion) (\(buildNumber))")
-                    .font(.appCaption)
-                    .foregroundColor(.themeSecondary)
-                    .padding(.top, 8)
+                Spacer()
             }
-            .padding(.vertical)
+            .padding(.horizontal)
+            .padding(.top, 16)
+            .padding(.bottom, 8)
+            .background(Color.themeBackground)
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Account section
+                    accountSection
+                    
+                    // Settings sections
+                    appearanceSection
+                    preferencesSection
+                    dataSection
+                    supportSection
+                    legalSection
+                    aboutSection
+                    
+                    // Footer note
+                    Text("Logbook One v\(appVersion) (\(buildNumber))")
+                        .font(.appCaption)
+                        .foregroundColor(.themeSecondary)
+                        .padding(.top, 8)
+                }
+                .padding(.vertical)
+            }
         }
         .background(Color.themeBackground)
         // This invisible view forces a refresh when refreshToggle changes
         .overlay(Color.clear.opacity(refreshToggle ? 0.0001 : 0))
         .sheet(isPresented: $showingMailView) {
             MailView(subject: mailSubject, result: $mailResult)
-        }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(image: $userImage)
         }
         .sheet(isPresented: $showingFeedbackForm) {
             FeedbackFormView(feedbackType: feedbackType)
@@ -100,6 +108,10 @@ struct SettingsView: View {
             // Check if sample data is active
             checkSampleDataStatus()
         }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbarBackground(Color.themeBackground, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .preferredColorScheme(getPreferredColorScheme())
     }
     
@@ -310,44 +322,6 @@ struct SettingsView: View {
         SettingsSectionView(title: "Account Info", icon: "person.crop.circle") {
             VStack(spacing: 16) {
                 HStack(spacing: 20) {
-                    // Avatar - shows user initials or uploaded image
-                    Button(action: {
-                        showingImagePicker = true
-                    }) {
-                        if let userImage = userImage {
-                            Image(uiImage: userImage)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 80, height: 80)
-                                .clipShape(Circle())
-                                .overlay(
-                                    Circle()
-                                        .stroke(Color.themeAccent, lineWidth: 2)
-                                )
-                        } else {
-                            // Show initials if name exists, otherwise show a placeholder
-                            ZStack {
-                                Circle()
-                                    .fill(Color.themeAccent.opacity(0.2))
-                                    .frame(width: 80, height: 80)
-                                    .overlay(
-                                        Circle()
-                                            .stroke(Color.themeAccent, lineWidth: 2)
-                                    )
-                                
-                                if !userName.isEmpty {
-                                    Text(getInitials(from: userName))
-                                        .font(.system(size: 32, weight: .bold))
-                                        .foregroundColor(.themeAccent)
-                                } else {
-                                    Image(systemName: "person.crop.circle")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.themeAccent)
-                                }
-                            }
-                        }
-                    }
-                    
                     // Name editor
                     VStack(alignment: .leading, spacing: 8) {
                         if editingName {
@@ -366,7 +340,7 @@ struct SettingsView: View {
                                 .foregroundColor(userName.isEmpty ? .themeSecondary : .themePrimary)
                         }
                         
-                        Text("Set your profile info")
+                        Text("Set your name for personalized greetings")
                             .font(.appCaption)
                             .foregroundColor(.themeSecondary)
                     }
@@ -394,19 +368,6 @@ struct SettingsView: View {
                 .padding()
             }
         }
-    }
-    
-    // Helper to get initials from a name
-    private func getInitials(from name: String) -> String {
-        let components = name.components(separatedBy: " ")
-        if components.count > 1, 
-           let first = components.first?.first,
-           let last = components.last?.first {
-            return String(first) + String(last)
-        } else if let first = components.first?.first {
-            return String(first)
-        }
-        return "?"
     }
     
     private var appearanceSection: some View {
@@ -814,47 +775,6 @@ struct ChangelogView: View {
         let version: String
         let date: String
         let changes: [String]
-    }
-}
-
-//MARK: - ImagePicker
-struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var image: UIImage?
-    @Environment(\.presentationMode) private var presentationMode
-    
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.allowsEditing = true
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
-        let parent: ImagePicker
-        
-        init(_ parent: ImagePicker) {
-            self.parent = parent
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let editedImage = info[.editedImage] as? UIImage {
-                parent.image = editedImage
-            } else if let originalImage = info[.originalImage] as? UIImage {
-                parent.image = originalImage
-            }
-            
-            parent.presentationMode.wrappedValue.dismiss()
-        }
-        
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.presentationMode.wrappedValue.dismiss()
-        }
     }
 }
 
