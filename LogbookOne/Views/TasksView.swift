@@ -3,6 +3,7 @@ import CoreData
 
 struct TasksView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.theme) private var theme
     @State private var showingAddTask = false
     @State private var selectedDate = Date() // Currently selected date
     @State private var showMonthPicker = false
@@ -470,6 +471,7 @@ struct TasksView: View {
 // Helper view for task cards
 struct TaskCardView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.theme) private var theme
     @ObservedObject var task: LogEntry
     @State private var isComplete: Bool = false
     var isOverdue: Bool = false
@@ -492,8 +494,8 @@ struct TaskCardView: View {
                 // Checkbox
                 Button(action: toggleCompletion) {
                     ZStack {
-                        Circle()
-                            .stroke(isComplete ? Color.themeAccent : (isOverdue ? Color.red : Color.gray.opacity(0.4)), lineWidth: 2)
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(isComplete ? Color.themeAccent : (isOverdue ? theme.danger : Color.gray.opacity(0.4)), lineWidth: 2)
                             .frame(width: 24, height: 24)
                         
                         if isComplete {
@@ -547,7 +549,7 @@ struct TaskCardView: View {
             .cornerRadius(16)
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(isOverdue ? Color.red.opacity(0.2) : Color.gray.opacity(0.1), lineWidth: 1)
+                    .stroke(isOverdue ? theme.danger.opacity(0.2) : Color.gray.opacity(0.1), lineWidth: 1)
             )
             .shadow(color: Color.black.opacity(0.03), radius: 3, x: 0, y: 1)
         }
@@ -600,6 +602,7 @@ struct TaskCardView: View {
 // Helper view for unscheduled task cards
 struct UnscheduledTaskCardView: View {
     @Environment(\.managedObjectContext) private var viewContext
+    @Environment(\.theme) private var theme
     @ObservedObject var task: LogEntry
     @State private var isComplete: Bool = false
     var assignTaskToToday: (LogEntry) -> Void
@@ -616,7 +619,7 @@ struct UnscheduledTaskCardView: View {
                 // Checkbox
                 Button(action: toggleCompletion) {
                     ZStack {
-                        Circle()
+                        RoundedRectangle(cornerRadius: 24)
                             .stroke(isComplete ? Color.themeAccent : Color.gray.opacity(0.4), lineWidth: 2)
                             .frame(width: 24, height: 24)
                         
