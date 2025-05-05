@@ -59,7 +59,7 @@ struct MainTabView: View {
     
     // References to view state
     @State private var tasksViewShowingAdd = false
-    
+
     var body: some View {
         ZStack {
             // Tab view as base layer

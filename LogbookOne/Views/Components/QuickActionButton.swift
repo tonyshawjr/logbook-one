@@ -7,6 +7,7 @@ struct QuickActionButton: View {
     
     @Binding var showingSheet: Bool
     var currentTab: Int
+    @ObservedObject private var nagManager = NagModeManager.shared
     
     var body: some View {
         // Only render actual content if we're on an allowed tab
@@ -22,6 +23,11 @@ struct QuickActionButton: View {
                         
                         // Show the appropriate quick add sheet
                         showingSheet = true
+                        
+                        // Tell NagMode that the user is logging an entry
+                        if nagManager.showInAppNag {
+                            nagManager.userLoggedEntry()
+                        }
                     }) {
                         Image(systemName: "plus")
                             .font(.system(size: 24, weight: .semibold))
@@ -34,6 +40,7 @@ struct QuickActionButton: View {
                             )
                     }
                     .buttonStyle(ScaleButtonStyle())
+                    .nagModePulse() // Apply the pulsing effect when Nag Mode is active
                     .padding(.trailing, 20)
                 }
             }
