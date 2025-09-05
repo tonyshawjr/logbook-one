@@ -14,6 +14,7 @@ enum TimePeriod: String, CaseIterable, Identifiable {
 
 // MARK: - Payments Header View
 struct PaymentsHeaderView: View {
+    
     var body: some View {
         HStack {
             // Title - "Payments" with styling matching Notes header
@@ -254,6 +255,12 @@ struct PaymentsView: View {
             .sheet(isPresented: $showingAddPayment) {
                 // Pre-select the payment type
                 LogEntryFormView(selectedType: .payment, client: selectedClient)
+            }
+            .onAppear {
+                // Set up notification observer for showing add payment
+                NotificationCenter.default.addObserver(forName: Notification.Name("ShowAddPayment"), object: nil, queue: .main) { _ in
+                    showingAddPayment = true
+                }
             }
         }
     }

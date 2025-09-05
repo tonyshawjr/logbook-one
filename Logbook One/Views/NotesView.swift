@@ -139,6 +139,23 @@ struct NotesView: View {
             NotesClientPickerView(selectedClient: $selectedClient)
                 .presentationDetents([.medium, .large])
         }
+        .sheet(isPresented: $showingAddNote) {
+            QuickAddView(initialEntryType: .note)
+                .presentationDragIndicator(.hidden)
+                .presentationDetents([.height(360)])
+                .presentationBackground(Color(uiColor: .systemBackground))
+                .presentationCornerRadius(24)
+                .interactiveDismissDisabled(false)
+                .onDisappear {
+                    NotificationCenter.default.post(name: .refreshAfterQuickAdd, object: nil)
+                }
+        }
+        .onAppear {
+            // Set up notification observer for showing add note
+            NotificationCenter.default.addObserver(forName: Notification.Name("ShowAddNote"), object: nil, queue: .main) { _ in
+                showingAddNote = true
+            }
+        }
     }
     
     private var emptyStateView: some View {
