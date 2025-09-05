@@ -28,20 +28,33 @@ struct QuickActionButton: View {
             ZStack {
                 // Background overlay for closing the menu when tapping elsewhere
                 if isMenuExpanded {
-                    Color.black.opacity(0.01)
-                        .edgesIgnoringSafeArea(.all)
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()  // This should cover the entire screen
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .onTapGesture {
                             closeMenu()
                         }
+                        .transition(.opacity)
                 }
                 
                 VStack {
                     Spacer()
+                    
+                    // Position FAB in bottom-right with better integration
                     HStack {
-                        Spacer() // Push to right
+                        Spacer()
                         
-                        // FAB Menu Items (only visible when expanded)
+                        // FAB container with background blur for better visual separation
                         ZStack {
+                            // Subtle background blur to separate FAB from content
+                            if isMenuExpanded {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .frame(width: 180, height: 180)
+                                    .blur(radius: 10)
+                                    .opacity(0.8)
+                            }
+                            
                             // Display the menu items in an arc
                             ForEach(Array(menuItems.enumerated()), id: \.offset) { index, item in
                                 if isMenuExpanded {
@@ -59,7 +72,7 @@ struct QuickActionButton: View {
                                 }
                             }
                             
-                            // Main FAB Button
+                            // Main FAB Button - slightly larger for easier tapping
                             Button(action: {
                                 // Use haptic feedback when pressing button
                                 let impactMed = UIImpactFeedbackGenerator(style: .medium)
@@ -84,13 +97,13 @@ struct QuickActionButton: View {
                                 }
                             }) {
                                 Image(systemName: isMenuExpanded ? "xmark" : "plus")
-                                    .font(.system(size: 24, weight: .semibold))
+                                    .font(.system(size: 22, weight: .semibold))
                                     .foregroundColor(.white)
-                                    .frame(width: 60, height: 60)
+                                    .frame(width: 56, height: 56) // Slightly smaller, more integrated size
                                     .background(
                                         Circle()
                                             .fill(theme.accent)
-                                            .shadow(color: theme.accent.opacity(0.3), radius: 5, x: 0, y: 3)
+                                            .shadow(color: Color.black.opacity(0.2), radius: 6, x: 0, y: 3)
                                     )
                             }
                             .rotationEffect(Angle(degrees: isMenuExpanded ? 90 : 0))
@@ -98,13 +111,17 @@ struct QuickActionButton: View {
                             .nagModePulse() // Apply the pulsing effect when Nag Mode is active
                         }
                         .padding(.trailing, 20) // Add right padding
-                        .padding(.bottom, 20) // Add bottom padding to raise the button
                     }
-                    // Add more space between the button and the tab bar
-                    .padding(.bottom, UIDevice.current.hasHomeIndicator ? 90 : 75)
+                    .padding(.bottom, 20) // Add spacing from content
+                    
+                    // Adjusted spacing to prevent overlap with tab bar
+                    // Extra padding to ensure it doesn't feel "lost"
+                    .padding(.bottom, UIDevice.current.hasHomeIndicator ? 85 : 70)
                 }
                 .background(Color.clear)
             }
+            // Add high z-index to ensure FAB stays on top
+            .zIndex(1000)
             .sheet(item: $selectedType) { type in
                 QuickAddView(initialEntryType: type)
                     .presentationDragIndicator(.hidden)
@@ -150,24 +167,24 @@ struct QuickActionButton: View {
     
     // Helper to create a FAB menu item with position based on index
     private func fabMenuItem(icon: String, label: String, color: Color, index: Int, total: Int, isHighlighted: Bool) -> some View {
-        // Define angles for each action type (mirrored to the left)
+        // Define angles for each action type - optimized for center positioning
         let angleForType: Double
         if label == "Task" {
-            angleForType = -15.0      // Slightly down-right (4:30 position)
+            angleForType = 60.0      // Upper-right for easier reach
         } else if label == "Note" {
-            angleForType = 37.5     // Position between Payment (90°) and Task (-15°)
+            angleForType = 90.0      // Straight up (12 o'clock)
         } else { // Payment
-            angleForType = 90.0     // 12 o'clock → up
+            angleForType = 120.0     // Upper-left for balance
         }
         
         // Convert degrees to radians
         let radians = angleForType * .pi / 180
      
-        // Radius from FAB center
-        let radius: CGFloat = 90
+        // Radius from FAB center - increased to prevent overlap
+        let radius: CGFloat = 100
      
-        // Mirror x-axis (right to left)
-        let xOffset = -cos(radians) * radius
+        // Calculate offsets
+        let xOffset = cos(radians) * radius
         let yOffset = -sin(radians) * radius
         
         // Return only the icon button without text label
@@ -179,16 +196,17 @@ struct QuickActionButton: View {
                     .scaleEffect(pulseAmount)
             }
             
-            // Button background
+            // Button background with subtle shadow
             Circle()
                 .fill(color)
+                .shadow(color: Color.black.opacity(0.2), radius: 4, x: 0, y: 2)
             
-            // Button icon
+            // Button icon - larger for better visibility
             Image(systemName: icon)
-                .font(.system(size: isHighlighted ? 20 : 18, weight: .semibold))
+                .font(.system(size: isHighlighted ? 22 : 20, weight: .semibold))
                 .foregroundColor(.white)
         }
-        .frame(width: 48, height: 48)
+        .frame(width: 52, height: 52) // Increased from 48 to 52 for better touch targets
         .offset(x: xOffset, y: yOffset)
         .transition(.scale.combined(with: .opacity))
     }

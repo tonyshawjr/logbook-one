@@ -195,6 +195,12 @@ struct TasksView: View {
                     .presentationDetents([.medium])
                     .presentationBackground(Color(uiColor: .systemBackground))
             }
+            .onAppear {
+                // Set up notification observer for showing add task
+                NotificationCenter.default.addObserver(forName: Notification.Name("ShowAddTask"), object: nil, queue: .main) { _ in
+                    showingAddTask = true
+                }
+            }
         }
     }
     

@@ -202,20 +202,29 @@ struct DashboardView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // User greeting
+            VStack(spacing: 24) {
+                // User greeting - simplified
                 personalGreeting
                 
-                // Revenue summary
-                revenueCard
-                
-                // Task overview - only show if there are tasks due today
-                if !tasksForToday.isEmpty {
-                    taskOverviewCard
+                // Combined stats section with better spacing
+                VStack(spacing: 20) {
+                    // Revenue summary
+                    revenueCard
+                    
+                    // Task overview - only show if there are tasks
+                    if !tasksForToday.isEmpty || !overdueTasks.isEmpty || !undatedTasks.isEmpty {
+                        taskOverviewCard
+                    }
                 }
                 
-                // Today's entries section
-                VStack(spacing: 16) {
+                // Divider between sections
+                Rectangle()
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(height: 1)
+                    .padding(.horizontal)
+                
+                // Today's entries section with improved spacing
+                VStack(spacing: 12) {
                     sectionHeader
                     
                     if todayEntries.isEmpty {
@@ -225,7 +234,7 @@ struct DashboardView: View {
                     }
                 }
             }
-            .padding(.vertical)
+            .padding(.vertical, 16)
             .id(refreshID) // Force refresh when ID changes
         }
         .background(Color.themeBackground)
@@ -247,42 +256,54 @@ struct DashboardView: View {
         }
     }
     
-    // Personal greeting based on time of day
+    // Personal greeting - simplified without motivational quotes
     private var personalGreeting: some View {
-        let timeOfDay = getCurrentTimeOfDay()
-        
-        return VStack(alignment: .leading, spacing: 16) {
-            // Simple greeting with first name and wave emoji
-            HStack {
-                Text("Hello \(getFirstName())! 👋")
-                    .font(.system(size: 22, weight: .regular))
+        HStack {
+            // Simple greeting based on time
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(getTimeGreeting()) \(getFirstName())")
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
                     .foregroundColor(.themePrimary)
                 
-                Spacer()
-                
-                // Settings button
-                NavigationLink(destination: SettingsView()) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 22))
-                        .foregroundColor(.themeAccent)
-                        .padding(10)
-                        .background(
-                            Circle()
-                                .fill(Color.themeAccent.opacity(0.1))
-                        )
-                }
+                Text(Date(), style: .date)
+                    .font(.subheadline)
+                    .foregroundColor(.themeSecondary)
             }
             
-            // Main tagline - make this the headline
-            Text(timeOfDay.message)
-                .font(.system(size: 32, weight: .bold))
-                .foregroundColor(.themePrimary)
-                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            
+            // Settings button
+            NavigationLink(destination: SettingsView()) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 20))
+                    .foregroundColor(.themeAccent)
+                    .padding(10)
+                    .background(
+                        Circle()
+                            .fill(Color.themeAccent.opacity(0.1))
+                    )
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal)
         .padding(.top, 16)
-        .padding(.bottom, 8)
+    }
+    
+    // Helper to get appropriate time-based greeting
+    private func getTimeGreeting() -> String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        
+        switch hour {
+        case 5..<12:
+            return "Good morning"
+        case 12..<17:
+            return "Good afternoon"
+        case 17..<22:
+            return "Good evening"
+        default:
+            return "Good evening"
+        }
     }
     
     // Helper to extract first name from full name

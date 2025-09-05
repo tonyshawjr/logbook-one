@@ -550,13 +550,41 @@ struct QuickAddView: View {
     }
     
     var body: some View {
-        ZStack {
-            // Full-screen dark background that extends to edges and corners
-            Color(uiColor: .systemBackground)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // Header with close button and tabs at the top
+        VStack(spacing: 0) {
+            // Clean header like the menu
+            if !showTypeSelector {
+                // Show type title when opened from menu
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 10) {
+                            Image(systemName: iconForType(selectedType))
+                                .font(.system(size: 24))
+                                .foregroundColor(colorForType(selectedType))
+                            
+                            Text("New \(selectedType.displayName)")
+                                .font(.title3.bold())
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Text(currentPrompt)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 26))
+                            .foregroundColor(.gray)
+                            .symbolRenderingMode(.hierarchical)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 32)  // More padding at top
+                .padding(.bottom, 24)
+            } else {
+                // Original type selector for standalone mode
                 HStack {
                     // Type selector - Simple row of options
                     if showTypeSelector {
@@ -609,166 +637,178 @@ struct QuickAddView: View {
                     Spacer()
                     
                     Button(action: { dismiss() }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.themeAccent)
-                                .frame(width: 44, height: 44)
-                            
-                            Image(systemName: "xmark")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 24))
+                            .foregroundColor(.gray.opacity(0.4))
+                            .background(Circle().fill(Color(UIColor.tertiarySystemFill)))
                     }
                 }
-                .padding(.horizontal)
-                .padding(.top, keyboardIsShown ? 12 : 16)
-                
-                // Description field with fixed height - adjust based on type selector
-                TextField("", text: $description, axis: .vertical)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
+            }
+            
+            // Main input area with native styling
+            VStack(alignment: .leading, spacing: 0) {
+                TextField("", text: $description)
                     .placeholder(when: description.isEmpty) {
-                        Text(currentPrompt)
+                        Text(showTypeSelector ? currentPrompt : "Type here...")
                             .foregroundColor(.secondary)
                     }
-                    .font(.title3)
-                    .padding(.horizontal)
-                    .padding(.top, 6)
+                    .font(.body)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 24)
                     .focused($isDescriptionFocused)
                     .submitLabel(.done)
                     .onSubmit {
-                        if !description.isEmpty {
-                            saveEntry()
-                        }
+                        // Just dismiss the keyboard, don't save
+                        isDescriptionFocused = false
                     }
-                    .frame(height: showTypeSelector ? 120 : 100) // Slightly smaller when type selector is hidden
-                    .padding(.bottom, 4) // Reduce bottom padding
+                    .frame(minHeight: showTypeSelector ? 90 : 85)
                 
-                // Compact spacer - reduce the empty space
-                Spacer(minLength: 20) // Use a smaller minimum length
+                Divider()
+                    .padding(.horizontal, 24)
+            }
                 
-                // Bottom fields area with fixed heights
-                VStack(spacing: 12) { // Reduce spacing between elements
-                    // Payment fields & client/date selection
-                    HStack(spacing: 16) {
-                        // Client selection for all types
+                // Options area with clean native style
+                VStack(spacing: 0) {
+                    // Client selection
+                    Button(action: {
+                        showClientPicker = true
+                    }) {
+                        HStack {
+                            Image(systemName: "person.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.blue)
+                            
+                            Text(selectedClient?.name ?? "Select Client")
+                                .foregroundColor(selectedClient != nil ? .primary : .primary)
+                                .lineLimit(1)
+                            
+                            Spacer()
+                            
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 14))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 18)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Divider()
+                        .padding(.horizontal, 24)
+                    
+                    // Date selection for tasks
+                    if selectedType == .task {
                         Button(action: {
-                            showClientPicker = true
+                            if showDueDate {
+                                showDatePicker = true
+                            } else {
+                                showDueDate = true
+                                showDatePicker = true
+                            }
                         }) {
                             HStack {
-                                Text(selectedClient?.name ?? "Select Client")
-                                    .foregroundColor(selectedClient != nil ? .primary : .secondary)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .frame(height: 44)
-                            .padding(.horizontal, 12)
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(8)
-                        }
-                        
-                        Spacer(minLength: 0)
-                        
-                        // Date picker for tasks
-                        if selectedType == .task {
-                            if showDueDate {
-                                Button(action: {
-                                    showDatePicker = true
-                                }) {
-                                    HStack {
-                                        if Calendar.current.isDateInToday(dueDate) {
-                                            Text("Today")
-                                                .foregroundColor(.themeAccent)
-                                        } else if Calendar.current.isDateInTomorrow(dueDate) {
-                                            Text("Tomorrow")
-                                                .foregroundColor(.themeAccent)
-                                        } else {
-                                            Text(formattedDate(dueDate))
-                                                .foregroundColor(.themeAccent)
-                                                .lineLimit(1)
-                                        }
-                                        
-                                        Image(systemName: "calendar")
-                                            .foregroundColor(.themeAccent)
-                                            .font(.system(size: 14))
-                                            .padding(.leading, 2)
+                                Image(systemName: showDueDate ? "calendar" : "calendar.badge.plus")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.themeAccent)
+                                
+                                if showDueDate {
+                                    if Calendar.current.isDateInToday(dueDate) {
+                                        Text("Today")
+                                            .foregroundColor(.primary)
+                                    } else if Calendar.current.isDateInTomorrow(dueDate) {
+                                        Text("Tomorrow")
+                                            .foregroundColor(.primary)
+                                    } else {
+                                        Text(formattedDate(dueDate))
+                                            .foregroundColor(.primary)
                                     }
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 44)
-                                    .background(Color(UIColor.secondarySystemBackground))
-                                    .cornerRadius(8)
-                                    .frame(maxWidth: 150)
+                                } else {
+                                    Text("Add Due Date")
+                                        .foregroundColor(.primary)
                                 }
                                 
-                                // Delete date button
-                                Button(action: {
-                                    // Reset date to tomorrow
-                                    dueDate = Date().addingTimeInterval(86400)
-                                    // Toggle due date flag
-                                    showDueDate = false
-                                }) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundColor(.secondary)
-                                        .font(.system(size: 18))
-                                }
-                                .padding(.leading, -8)
-                            } else {
-                                // Add due date button
-                                Button(action: {
-                                    showDueDate = true
-                                    showDatePicker = true
-                                }) {
-                                    HStack {
-                                        Image(systemName: "calendar.badge.plus")
-                                            .foregroundColor(.themeAccent)
-                                        Text("Add Due Date")
-                                            .foregroundColor(.themeAccent)
-                                            .font(.subheadline)
+                                Spacer()
+                                
+                                if showDueDate {
+                                    Button(action: {
+                                        showDueDate = false
+                                        dueDate = Date().addingTimeInterval(86400)
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 18))
+                                            .foregroundColor(.gray)
                                     }
-                                    .padding(.horizontal, 12)
-                                    .frame(height: 44)
-                                    .background(Color(UIColor.secondarySystemBackground))
-                                    .cornerRadius(8)
-                                    .frame(maxWidth: 150)
+                                } else {
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.gray)
                                 }
                             }
+                            .padding(.horizontal, 24)
+                            .padding(.vertical, 18)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(PlainButtonStyle())
                         
-                        // Payment amount field
-                        if selectedType == .payment {
-                            HStack {
+                        Divider()
+                            .padding(.horizontal, 24)
+                    }
+                    
+                    // Payment amount field
+                    if selectedType == .payment {
+                        HStack {
+                            Image(systemName: "dollarsign.circle.fill")
+                                .font(.system(size: 24))
+                                .foregroundColor(.green)
+                            
+                            Text("Amount")
+                                .foregroundColor(.primary)
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
                                 Text("$")
-                                    .foregroundColor(.secondary)
-                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                    .font(.system(size: 17, weight: .medium))
                                 
                                 TextField("0.00", text: $amount)
                                     .keyboardType(.decimalPad)
-                                    .font(.headline)
+                                    .multilineTextAlignment(.trailing)
+                                    .frame(width: 100)
+                                    .font(.system(size: 17, weight: .medium))
+                                    .foregroundColor(.primary)
                             }
-                            .padding(.horizontal, 12)
-                            .frame(height: 44)
-                            .background(Color(UIColor.secondarySystemBackground))
-                            .cornerRadius(8)
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.vertical, 18)
+                        
+                        Divider()
+                            .padding(.horizontal, 24)
                     }
-                    
-                    // Save button
-                    Button(action: saveEntry) {
-                        Text("Save")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 54)
-                            .background(isFormValid ? Color.themeAccent : Color.themeAccent.opacity(0.5))
-                            .cornerRadius(12)
-                    }
-                    .disabled(!isFormValid)
                 }
-                .padding(.horizontal)
-                .padding(.bottom, 16)
-            }
-            .frame(height: showTypeSelector ? 420 : 360) // Shorter height when type selector is hidden
+                
+                Spacer()
+                
+                // Save button at bottom
+                Button(action: saveEntry) {
+                    Text("Save")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(isFormValid ? .white : .white.opacity(0.6))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(isFormValid ? Color.themeAccent : Color.gray.opacity(0.15))
+                        .cornerRadius(14)
+                }
+                .disabled(!isFormValid)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
         }
-        .background(Color.clear) // Clear the default background to let our ZStack background handle it
+        .background(Color(uiColor: .systemBackground))
+        .ignoresSafeArea(edges: .bottom)
         // Modals and pickers
         .sheet(isPresented: $showClientPicker) {
             QuickClientPickerView(selectedClient: $selectedClient)

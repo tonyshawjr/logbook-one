@@ -188,27 +188,51 @@ struct ClientDetailView: View {
     
     var body: some View {
         ScrollView {
-            VStack(spacing: 20) {
-                // Client header
+            VStack(spacing: 28) {
+                // Client header with better spacing
                 clientHeaderView
+                    .padding(.top, 8)
                 
-                // Summary card
-                summaryCard
-                
-                // Filters
-                filterSegments
-                
-                // Entries
-                if filteredEntries.isEmpty {
-                    emptyEntriesView
-                } else {
-                    entriesList
+                // Financial section with header
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack {
+                        Text("Financial Overview")
+                            .font(.appTitle3)
+                            .foregroundColor(.themePrimary)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    
+                    summaryCard
                 }
                 
-                // Add entry button
+                // Divider with proper spacing
+                Rectangle()
+                    .fill(Color.gray.opacity(0.15))
+                    .frame(height: 1)
+                    .padding(.horizontal)
+                    .padding(.vertical, 4)
+                
+                // Entries section with header
+                VStack(alignment: .leading, spacing: 16) {
+                    filterSegments
+                    
+                    // Entries
+                    if filteredEntries.isEmpty {
+                        emptyEntriesView
+                    } else {
+                        entriesList
+                    }
+                }
+                
+                // Add entry button with more spacing
                 addEntryButton
+                    .padding(.top, 8)
+                
+                // Bottom padding for safety
+                Color.clear.frame(height: 20)
             }
-            .padding(.vertical)
+            .padding(.vertical, 12)
         }
         .background(Color.themeBackground)
         .navigationTitle(client.name ?? "Client")
@@ -341,58 +365,39 @@ struct ClientDetailView: View {
     
     private var summaryCard: some View {
         VStack(spacing: 12) {
-            // Header
-            HStack {
-                Label("Financial Summary", systemImage: "chart.bar.fill")
-                    .font(.appHeadline)
-                    .foregroundColor(.themePrimary)
-                Spacer()
-            }
-            .padding(.horizontal)
-            
-            // Swipeable cards
+            // Swipeable cards - reduced to 3 for simplicity
             TabView(selection: $selectedFinancialCard) {
-                // Card 1: Payment Status (Most Critical for Freelancers)
+                // Card 1: Overview - combines key metrics
+                QuickOverviewCard(
+                    thisMonth: thisMonthPayments,
+                    thisYear: thisYearPayments,
+                    totalPayments: totalPayments,
+                    paymentCount: paymentCount,
+                    formatCurrency: formatCurrency
+                )
+                .tag(0)
+                
+                // Card 2: Payment History
                 PaymentStatusCard(
                     client: client,
                     entries: entries,
                     formatCurrency: formatCurrency
                 )
-                .tag(0)
-                
-                // Card 2: This Year's Performance
-                YearPerformanceCard(
-                    thisYear: thisYearPayments,
-                    lastYear: lastYearPayments,
-                    paymentCount: paymentCount,
-                    averagePayment: paymentCount > 0 ? totalPayments / Double(paymentCount) : 0,
-                    formatCurrency: formatCurrency
-                )
                 .tag(1)
                 
-                // Card 3: Payment Patterns
+                // Card 3: Payment Patterns (12-month chart)
                 PaymentPatternsCard(
                     monthlyData: monthlyPayments,
                     entries: entries,
                     formatCurrency: formatCurrency
                 )
                 .tag(2)
-                
-                // Card 4: Client Value
-                ClientValueCard(
-                    client: client,
-                    allTime: totalPayments,
-                    thisYear: thisYearPayments,
-                    paymentCount: paymentCount,
-                    formatCurrency: formatCurrency
-                )
-                .tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 240)
+            .frame(height: 210)  // Slightly increased to prevent content cutoff
             
             // Custom page indicator dots - now outside and below the cards
-            PageIndicator(currentPage: $selectedFinancialCard, totalPages: 4)
+            PageIndicator(currentPage: $selectedFinancialCard, totalPages: 3)
         }
     }
     
@@ -750,11 +755,90 @@ struct FinancialCardBase<Content: View>: View {
                 .padding(16)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(height: 220)
+        .frame(height: 190)  // Adjusted to prevent content cutoff
         .background(Color.themeCard)
         .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, x: 0, y: 2)
         .padding(.horizontal)
+    }
+}
+
+// Quick Overview Card - Simplified combined metrics
+struct QuickOverviewCard: View {
+    let thisMonth: Double
+    let thisYear: Double
+    let totalPayments: Double
+    let paymentCount: Int
+    let formatCurrency: (Double, Bool) -> String
+    
+    var body: some View {
+        FinancialCardBase(
+            headerTitle: "Overview",
+            headerSubtitle: "Key metrics at a glance",
+            headerColor: .themeAccent
+        ) {
+            VStack(spacing: 16) {
+                // Top row - main metrics
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("This Month")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.themeSecondary)
+                        
+                        Text(formatCurrency(thisMonth, false))
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.themePrimary)
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("This Year")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.themeSecondary)
+                        
+                        Text(formatCurrency(thisYear, false))
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.themeAccent)
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                    }
+                }
+                
+                Divider()
+                
+                // Bottom row - secondary metrics
+                HStack(spacing: 20) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("All Time")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.themeSecondary)
+                        
+                        Text(formatCurrency(totalPayments, false))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.themePrimary)
+                            .minimumScaleFactor(0.8)
+                            .lineLimit(1)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Payments")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.themeSecondary)
+                        
+                        Text("\(paymentCount)")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.themePrimary)
+                    }
+                }
+                
+                Spacer()
+            }
+        }
     }
 }
 
